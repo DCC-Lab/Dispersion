@@ -13,8 +13,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/dispersion.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="629">
-              <caret line="37" column="63" lean-forward="true" selection-start-line="36" selection-start-column="80" selection-end-line="37" selection-end-column="63" />
+            <state relative-caret-position="274">
+              <caret line="73" column="26" lean-forward="true" selection-start-line="73" selection-start-column="26" selection-end-line="73" selection-end-column="26" />
               <folding>
                 <element signature="e#0#31#0" expanded="true" />
               </folding>
@@ -53,7 +53,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -65,6 +64,7 @@
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -149,8 +149,8 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/dispersion.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="629">
-          <caret line="37" column="63" lean-forward="true" selection-start-line="36" selection-start-column="80" selection-end-line="37" selection-end-column="63" />
+        <state relative-caret-position="274">
+          <caret line="73" column="26" lean-forward="true" selection-start-line="73" selection-start-column="26" selection-end-line="73" selection-end-column="26" />
           <folding>
             <element signature="e#0#31#0" expanded="true" />
           </folding>
