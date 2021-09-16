@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sympy import *
 
-
 class Pulse:
     def __init__(self, duration, TL, wavelength):
         self.duration = duration
@@ -81,7 +80,8 @@ class Pulse:
         plt.savefig('time-bandwidth-product.png', dpi=200)
         plt.show()
 
-pulseTest = Pulse(90e-15, 1.13, 800e-9)
-pulseTest.frequencySpectra
-pulseTest.propagate("BK7", 0.15)
-#pulseTest.plotPulses()
+if __name__ == "__main__":
+    pulseTest = Pulse(90e-15, 1.13, 800e-9)
+    pulseTest.frequencySpectra
+    pulseTest.propagate("BK7", 0.15)
+    #pulseTest.plotPulses()
