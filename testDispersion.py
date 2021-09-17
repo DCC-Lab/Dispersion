@@ -22,7 +22,33 @@ class TestFFTAndPulses(unittest.TestCase):
         self.assertIsNotNone(field)
         self.assertTrue(abs(field[0]) < 1e-6 )
         self.assertTrue(abs(field[N-1]) < 1e-6 )
+    def test03FourierTransformCalibration(self):
+        """ If I understand FFTs, then the max frequency is f_max = 1 / 2 * T  and ∆f = 1/(2*T*N)
+        It starts at zero, goes to f_max-df, then -f_max to -df"""
+        T = 160e-15
+        N = 16
+        t = np.linspace(-T, T, N)
+        dt = 2*T/N
+        f_max = 1/2/dt
+        df = 1/(2*T)
 
+        frequencies = np.fft.fftfreq(N, dt)
+        self.assertEqual(frequencies[0], 0)
+        self.assertEqual(frequencies[1], df)
+        self.assertEqual(frequencies[-1], -df)
+        self.assertEqual(frequencies[int(N/2)], -f_max)
+        self.assertEqual(frequencies[int(N/2)-1], f_max-df)
 
+    def test04MoreFourierTransformCalibration(self):
+        T = 160e-15
+        N = 16
+        t = np.linspace(-T, T, N)
+        dt = 2*T/N
+        f_max = 1/2/dt
+        df = 1/(2*T)
+
+        frequencies = np.fft.fftfreq(N, dt)
+        myFrequencies = np.concatenate((np.linspace(0, f_max-df, int(N/2)-1), np.linspace(-f_max, -df, int(N/2))) )
+        self.assertTrue(frequencies.all() == myFrequencies.all())
 if __name__ == '__main__':
     unittest.main()
