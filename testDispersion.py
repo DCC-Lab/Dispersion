@@ -54,9 +54,9 @@ class TestFFTAndPulses(unittest.TestCase):
 
     def test05FourierTransformNormalization(self):
         """ Back and forth should give us the original field """
-        
-        T = 200e-15
-        N = 128
+
+        T = 1000e-15 # if this is too large, it does not work
+        N = 256      # if this is too laarge, it does not work. Probably rounding error
         sigma = (100e-15)
         t = np.linspace(-T, T, N)
         dt = 2*T/N
