@@ -53,7 +53,7 @@ class TestFFTAndPulses(unittest.TestCase):
         self.assertTrue(frequencies.all() == myFrequencies.all())
 
     def test05FourierTransformNormalization(self):
-        """ Back and forth should give us the original field """
+        """ FFT-iFFT Back and forth should give us the original field """
 
         T = 1000e-15 # if this is too large, it does not work
         N = 256      # if this is too laarge, it does not work. Probably rounding error
@@ -65,8 +65,33 @@ class TestFFTAndPulses(unittest.TestCase):
 
         temporalField = np.exp(-t*t/(sigma*sigma))
         fourierField = np.fft.fft(temporalField)
-        tranformedField = np.fft.ifft(fourierField)
-        self.assertTrue(temporalField.all() == tranformedField.all())
+        retranformedField = np.fft.ifft(fourierField)
+        self.assertTrue(temporalField.all() == retranformedField.all())
+
+    def test06FourierTransformAnOffsetInTimeIsAPhaseShiftInFrequencySpace(self):
+        """ I know that if I shift somethign in time by to, the spectrum will have a linear
+        phase added of -2pi*to*f"""
+
+        T = 5000e-15 
+        N = 5000      
+        sigma = (100e-15)
+        t = np.linspace(-T, T, N)
+        dt = 2*T/N
+        f_max = 1/2/dt
+        df = 1/(2*T)
+        to = 10e-15
+
+        temporalField = np.exp(-(t*t)/(sigma*sigma))
+        originalFourierField = np.fft.fft(temporalField)
+
+        shiftedTemporalField = np.exp(-(t-to)*(t-to)/(sigma*sigma))
+        shiftedFourierField = np.fft.fft(shiftedTemporalField)
+
+        phaseDifference = np.angle(shiftedFourierField/originalFourierField)
+        self.assertAlmostEqual(phaseDifference[0], 0)
+        self.assertAlmostEqual(phaseDifference[1], -df*to*2*np.pi, 4)
+        frequencies = np.fft.fftfreq(N, dt)
+        self.assertAlmostEqual(phaseDifference.all(), (-frequencies*to*2*np.pi).all(), 4)
 
 if __name__ == '__main__':
     unittest.main()
