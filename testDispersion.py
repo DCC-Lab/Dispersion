@@ -40,6 +40,7 @@ class TestFFTAndPulses(unittest.TestCase):
         self.assertEqual(frequencies[int(N/2)-1], f_max-df)
 
     def test04MoreFourierTransformCalibration(self):
+        """ So I should be able to reconstruct the frequencies if I understand well """
         T = 160e-15
         N = 16
         t = np.linspace(-T, T, N)
@@ -50,5 +51,22 @@ class TestFFTAndPulses(unittest.TestCase):
         frequencies = np.fft.fftfreq(N, dt)
         myFrequencies = np.concatenate((np.linspace(0, f_max-df, int(N/2)-1), np.linspace(-f_max, -df, int(N/2))) )
         self.assertTrue(frequencies.all() == myFrequencies.all())
+
+    def test05FourierTransformNormalization(self):
+        """ Back and forth should give us the original field """
+        
+        T = 200e-15
+        N = 128
+        sigma = (100e-15)
+        t = np.linspace(-T, T, N)
+        dt = 2*T/N
+        f_max = 1/2/dt
+        df = 1/(2*T)
+
+        temporalField = np.exp(-t*t/(sigma*sigma))
+        fourierField = np.fft.fft(temporalField)
+        tranformedField = np.fft.ifft(fourierField)
+        self.assertTrue(temporalField.all() == tranformedField.all())
+
 if __name__ == '__main__':
     unittest.main()
