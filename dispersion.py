@@ -16,7 +16,7 @@ class Pulse:
     @property
     def frequencySpectra(self):
         self.EfieldFrequency = np.fft.fftshift(np.fft.fft(self.EfieldTime))
-        self.IntensityFrequency = self.EfieldFrequency**2
+        self.IntensityFrequency = abs(self.EfieldFrequency)**2
         self.frequency  = np.fft.fftshift(np.fft.fftfreq(self.EfieldFrequency.shape[0],self.time[1]-self.time[0]))
         self.FWHMfreq = 2 * np.abs(self.frequency[np.argmin(np.abs(0.5*np.max(self.IntensityFrequency)-self.IntensityFrequency))])
         self.FWHMwavelength = self.wavelength**2 * self.FWHMfreq/3e8
@@ -36,18 +36,23 @@ class Pulse:
         else:
             raise ValueError("chosen material not available")
 
+
         n = lambdify(x, n)  #input is in micrometers
-        phaseTerm = [exp(i*n(c*10**6/i)*thickness*-1j/c) for i in shiftedFreq]
-        EfieldFrequencyPropagated = [a*b for a,b in zip(self.EfieldFrequency, phaseTerm)]
-        EfieldTimeOut = abs(np.fft.ifft(np.fft.ifftshift(EfieldFrequencyPropagated)))
-        IntensityOut = EfieldTimeOut**2
+        nValues = [n(c * 10 ** 6 / i) for i in shiftedFreq]
+        phaseTerm = [exp(i*n(c*10**6/i)*2*np.pi*thickness*-1j/c) for i in shiftedFreq]
+        #phaseTerm = [exp(i/i *0* -1j) for i in shiftedFreq]
+        EfieldFrequencyPropagated = [a*b for a,b in zip(self.EfieldFrequency.real, phaseTerm)]
+        EfieldTimeOut = np.fft.ifft(np.fft.ifftshift(EfieldFrequencyPropagated))
+        IntensityOut = abs(EfieldTimeOut)**2
         mu = self.time.dot(IntensityOut / IntensityOut.sum())
         mu2 = np.power(self.time, 2).dot(IntensityOut / IntensityOut.sum())
         var = mu2 - mu ** 2
         print("FWHM of new pulse : " + str(2.35482 * sqrt(var) * 10 ** 15))
-        plt.plot(self.time, IntensityOut, '-r', self.time, self.IntensityTime, '.b')
 
+        plt.plot(self.time, self.IntensityTime, "r", self.time, IntensityOut, "k-")
         plt.show()
+
+        
         # GVD = (self.wavelength*10**6)**3/(2*np.pi*(c)**2)*f.diff(x, 2) * 10**21
 
     def plotPulses(self):
@@ -81,7 +86,7 @@ class Pulse:
         plt.show()
 
 if __name__ == "__main__":
-    pulseTest = Pulse(90e-15, 1.13, 800e-9)
+    pulseTest = Pulse(90e-15, 1, 800e-9)
     pulseTest.frequencySpectra
-    pulseTest.propagate("BK7", 0.15)
-    #pulseTest.plotPulses()
+    pulseTest.propagate("silica", 0.15)
+    pulseTest.plotPulses()

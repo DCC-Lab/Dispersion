@@ -64,8 +64,8 @@ class TestFFTAndPulses(unittest.TestCase):
         df = 1/(2*T)
 
         temporalField = np.exp(-t*t/(sigma*sigma))
-        fourierField = np.fft.fft(temporalField)
-        retranformedField = np.fft.ifft(fourierField)
+        fourierField = np.fft.fftshift(np.fft.fft(temporalField))
+        retranformedField = np.fft.ifft(np.fft.ifftshift(fourierField))
         self.assertTrue(temporalField.all() == retranformedField.all())
 
     def test06FourierTransformAnOffsetInTimeIsAPhaseShiftInFrequencySpace(self):
