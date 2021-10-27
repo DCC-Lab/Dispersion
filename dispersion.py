@@ -11,6 +11,9 @@ class Pulse:
         self.IntensityTime = 1/((self.duration / 2.35482)*np.sqrt(2*np.pi))*np.exp(-self.time**2 / (2*(self.duration / 2.35482)**2))
         self.IntensityTimeTL = 1 / ((self.duration / 2.35482) * np.sqrt(2 * np.pi)) * np.exp(-self.time ** 2 / (2 * (self.duration / self.TL / 2.35482) ** 2))
         self.EfieldTime = np.sqrt(self.IntensityTimeTL)
+        self.IntensityTimePropagated = []
+        self.durationPropagated = 0
+        self.EfieldFrequency = None
 
 
     @property
@@ -20,6 +23,7 @@ class Pulse:
         self.frequency  = np.fft.fftshift(np.fft.fftfreq(self.EfieldFrequency.shape[0],self.time[1]-self.time[0]))
         self.FWHMfreq = 2 * np.abs(self.frequency[np.argmin(np.abs(0.5*np.max(self.IntensityFrequency)-self.IntensityFrequency))])
         self.FWHMwavelength = self.wavelength**2 * self.FWHMfreq/3e8
+        print("FWHM of initial pulse : " + str(self.duration * 10 ** 15) + " fs")
         return self.frequency, self.EfieldFrequency, self.IntensityFrequency, self.FWHMfreq, self.FWHMwavelength
 
 
@@ -41,29 +45,29 @@ class Pulse:
         nValues = [n(c * 10 ** 6 / i) for i in shiftedFreq]
         phaseTerm = [exp(i*n(c*10**6/i)*2*np.pi*thickness*-1j/c) for i in shiftedFreq]
         #phaseTerm = [exp(i/i *0* -1j) for i in shiftedFreq]
-        EfieldFrequencyPropagated = [a*b for a,b in zip(self.EfieldFrequency.real, phaseTerm)]
-        EfieldTimeOut = np.fft.ifft(np.fft.ifftshift(EfieldFrequencyPropagated))
-        IntensityOut = abs(EfieldTimeOut)**2
-        mu = self.time.dot(IntensityOut / IntensityOut.sum())
-        mu2 = np.power(self.time, 2).dot(IntensityOut / IntensityOut.sum())
+        self.EfieldFrequency = [a*b for a,b in zip(self.EfieldFrequency, phaseTerm)]
+        EfieldTimeOut = np.fft.ifft(np.fft.ifftshift(self.EfieldFrequency))
+        self.IntensityTimePropagated = abs(EfieldTimeOut)**2
+        mu = self.time.dot(self.IntensityTimePropagated / self.IntensityTimePropagated.sum())
+        mu2 = np.power(self.time, 2).dot(self.IntensityTimePropagated / self.IntensityTimePropagated.sum())
         var = mu2 - mu ** 2
-        print("FWHM of new pulse : " + str(2.35482 * sqrt(var) * 10 ** 15))
+        self.durationPropagated = 2.35482 * sqrt(var)
 
-        plt.plot(self.time, self.IntensityTime, "r", self.time, IntensityOut, "k-")
-        plt.show()
-
+        #print("FWHM of new pulse : " + str("%.2f" %self.durationPropagated) + " fs")
+        #plt.plot(self.time, self.IntensityTime, "r", self.time, self.IntensityTimePropagated, "k-")
+        #plt.show()
         
         # GVD = (self.wavelength*10**6)**3/(2*np.pi*(c)**2)*f.diff(x, 2) * 10**21
 
-    def plotPulses(self):
-        fig, axs = plt.subplots(2,1, figsize=(6,8))
+    def plotInitialPulse(self):
+        fig, axs = plt.subplots(2,1, figsize=(6,6))
 
         axs[0].set_title('Time domain')
         axs[0].plot(self.time, self.IntensityTime, label="Wavelength = %.1f nm"%(self.wavelength*10**9))
         axs[0].axvline(-self.duration*0.5, color='r', alpha=0.5, label='FWHM = %.1f fs'%(self.duration*1e15))
         axs[0].axvline(self.duration*0.5, color='r', alpha=0.5)
 
-        axs[0].set_xlim(-350e-15, 350e-15)
+        axs[0].set_xlim(-2*self.duration, 2*self.duration)
         #axs[0].set_ylim(0,1.3)
         axs[0].set_xlabel('Time (sec)')
 
@@ -73,7 +77,7 @@ class Pulse:
         axs[1].axvline(-self.FWHMfreq*0.5, color='g', alpha=0.5, label='FWHM is %.1f THz or %0.2f nm'%(self.FWHMfreq*10**-12, self.FWHMwavelength*10**9))
         axs[1].axvline( self.FWHMfreq*0.5, color='g', alpha=0.5)
 
-        axs[1].set_xlim(-1.0e13,1.0e13)
+        axs[1].set_xlim(-3*self.FWHMfreq,3*self.FWHMfreq)
         #axs[1].set_ylim(0,30000)
         axs[1].set_xlabel('Frequency (Hz)')
 
@@ -85,8 +89,27 @@ class Pulse:
         plt.savefig('time-bandwidth-product.png', dpi=200)
         plt.show()
 
+    def plotPropagatedPulse(self):
+        print("FWHM of propagated pulse : %.1f fs"%(self.durationPropagated*1e15))
+        peakIndex = np.argmax(self.IntensityTimePropagated)
+        PropagatedShift = int(-1*(len(self.IntensityTimePropagated)/2 - peakIndex))
+        PropagatedCentered = np.append(self.IntensityTimePropagated[PropagatedShift:], self.IntensityTimePropagated[:PropagatedShift])
+
+        fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+        ax.set_title('Time domain')
+        ax.plot(self.time, self.IntensityTime/max(self.IntensityTime), label="Original pulse, length = %.1f fs"%(self.duration*1e15))
+        ax.plot(self.time, PropagatedCentered/max(self.IntensityTime), label="Propagated pulse, length = %.1f fs"%(self.durationPropagated*1e15))
+        ax.set_xlim(-2*float(self.durationPropagated), 2*float(self.durationPropagated))
+        ax.set_xlabel('Time (sec)')
+        ax.legend(fontsize=8)
+        ax.set_ylabel('Electric field intensity (arbitrary units)')
+        plt.tight_layout()
+        plt.show()
+
+
 if __name__ == "__main__":
     pulseTest = Pulse(90e-15, 1, 800e-9)
     pulseTest.frequencySpectra
+    pulseTest.plotInitialPulse()
     pulseTest.propagate("silica", 0.15)
-    pulseTest.plotPulses()
+    pulseTest.plotPropagatedPulse()
