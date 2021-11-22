@@ -93,5 +93,47 @@ class TestFFTAndPulses(unittest.TestCase):
         frequencies = np.fft.fftfreq(N, dt)
         self.assertAlmostEqual(phaseDifference.all(), (-frequencies*to*2*np.pi).all(), 4)
 
+    def test07GetPulseDurationWithRMSwidthofPulse(self):
+        """I want to see if calculating the RMS width of the pulse gives the same value as the input
+        duration parameter"""
+
+        T = 10000e-15
+        N = 5000
+        sigma = (200e-15)
+        t = np.linspace(-T, T, N)
+
+        temporalField = np.exp(-(t * t) / (2 * sigma * sigma))
+        mu = t.dot(temporalField / temporalField.sum())
+        mu2 = np.power(t, 2).dot(temporalField / temporalField.sum())
+        RMS = np.sqrt(mu2 - mu ** 2)
+        self.assertTrue(RMS == sigma)
+
+    def test08timeBandwithProductOfPulseAndFFT(self):
+        """I want to see if multiplying the FWHM of the time pulse and frequency pulse gives correct
+        result, which is 0.44 for FWHM width of a gaussian"""
+
+        T = 10000e-15
+        N = 5000
+        sigma = (100e-15)
+        t = np.linspace(-T, T, N)
+        dt = 2 * T / N
+        frequencies = np.fft.fftfreq(N, dt)
+
+        temporalIntensity = np.exp(-(t * t) / (2 * sigma * sigma))
+        temporalField = np.sqrt(temporalIntensity)
+        FourierField = np.fft.fft(temporalField)
+        FourierIntensity = abs(FourierField)**2
+        mu = frequencies.dot(FourierIntensity / FourierIntensity.sum())
+        mu2 = np.power(frequencies, 2).dot(FourierIntensity/ FourierIntensity.sum())
+        var = mu2 - mu ** 2
+        RMSfreq = np.sqrt(var)
+
+
+        self.assertAlmostEqual(RMSfreq*sigma*2.35482*2.35482, 0.44, 2)
+
+        """I tried making this initially with the RMS width of a time-bandwidth product = 0.5, however
+        I could not make it work. From my understanding FWHM = 2.35482*RMS, so I don't see how the product of RMS width
+        can give a larger value."""
+
 if __name__ == '__main__':
     unittest.main()

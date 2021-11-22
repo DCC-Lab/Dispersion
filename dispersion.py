@@ -7,7 +7,7 @@ class Pulse:
         self.duration = duration
         self.TL = TL
         self.wavelength = wavelength
-        self.time = np.linspace(-5000e-15, 5000e-15, 5000)
+        self.time = np.linspace(-10000e-15, 10000e-15, 5000) #find a way to define with wavelength and duration
         self.IntensityTime = 1/((self.duration / 2.35482)*np.sqrt(2*np.pi))*np.exp(-self.time**2 / (2*(self.duration / 2.35482)**2))
         self.IntensityTimeTL = 1 / ((self.duration / 2.35482) * np.sqrt(2 * np.pi)) * np.exp(-self.time ** 2 / (2 * (self.duration / self.TL / 2.35482) ** 2))
         self.EfieldTime = np.sqrt(self.IntensityTimeTL)
@@ -36,7 +36,9 @@ class Pulse:
         if material == "silica":
             n = (1 + 1.03961212 / (1 - 0.00600069867 / x ** 2) + 0.231792344 / (1 - 0.0200179144 / x ** 2) + 1.01046945 / (1 - 103.560653 / x ** 2))**.5
         elif material == "BK7":
-            n = 1.2
+            n = (1 + 1.03961212 / (1 - 0.00600069867 / x ** 2) + 0.231792344 / (1 - 0.0200179144 / x ** 2) + 1.01046945 / (1 - 103.560653 / x ** 2)) ** .5
+        elif material == "SF10":
+            n = (1 + 1.62153902 / (1 - 0.0122241457 / x ** 2) + 0.256287842 / (1 - 0.0595736775 / x ** 2) + 1.64447552 / (1 - 147.468793 / x ** 2)) ** .5
         else:
             raise ValueError("chosen material not available")
 
@@ -95,10 +97,10 @@ class Pulse:
         PropagatedShift = int(-1*(len(self.IntensityTimePropagated)/2 - peakIndex))
         PropagatedCentered = np.append(self.IntensityTimePropagated[PropagatedShift:], self.IntensityTimePropagated[:PropagatedShift])
 
-        fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4))
         ax.set_title('Time domain')
-        ax.plot(self.time, self.IntensityTime/max(self.IntensityTime), label="Original pulse, length = %.1f fs"%(self.duration*1e15))
-        ax.plot(self.time, PropagatedCentered/max(self.IntensityTime), label="Propagated pulse, length = %.1f fs"%(self.durationPropagated*1e15))
+        ax.plot(self.time, self.IntensityTime/max(self.IntensityTime), label="Original pulse \nDuration = %.1f fs"%(self.duration*1e15))
+        ax.plot(self.time, PropagatedCentered/max(self.IntensityTime), label="Propagated pulse \nDuration = %.1f fs"%(self.durationPropagated*1e15))
         ax.set_xlim(-2*float(self.durationPropagated), 2*float(self.durationPropagated))
         ax.set_xlabel('Time (sec)')
         ax.legend(fontsize=8)
@@ -108,8 +110,9 @@ class Pulse:
 
 
 if __name__ == "__main__":
-    pulseTest = Pulse(90e-15, 1, 800e-9)
+    pulseTest = Pulse(120e-15, 1, 1270e-9)
     pulseTest.frequencySpectra
     pulseTest.plotInitialPulse()
     pulseTest.propagate("silica", 0.15)
+    #pulseTest.propagate("SF10", 0.05)
     pulseTest.plotPropagatedPulse()
