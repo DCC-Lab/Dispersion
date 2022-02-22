@@ -13,11 +13,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/dispersion.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="391">
-              <caret line="23" column="130" lean-forward="true" selection-start-line="23" selection-start-column="8" selection-end-line="23" selection-end-column="130" />
-              <folding>
-                <element signature="e#0#31#0" expanded="true" />
-              </folding>
+            <state>
+              <caret column="17" lean-forward="true" selection-start-column="17" selection-end-column="17" />
             </state>
           </provider>
         </entry>
@@ -25,8 +22,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/testDispersion.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="427">
-              <caret line="137" column="26" lean-forward="true" selection-start-line="137" selection-start-column="26" selection-end-line="137" selection-end-column="26" />
+            <state relative-caret-position="87">
+              <caret line="144" column="25" lean-forward="true" selection-start-line="144" selection-start-column="25" selection-end-line="144" selection-end-column="25" />
               <folding>
                 <element signature="e#0#15#0" expanded="true" />
               </folding>
@@ -49,16 +46,15 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/dispersion.py" />
         <option value="$PROJECT_DIR$/testDispersion.py" />
+        <option value="$PROJECT_DIR$/dispersion.py" />
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="7">
-    <option name="x" value="550" />
-    <option name="y" value="-20" />
-    <option name="width" value="980" />
-    <option name="height" value="1040" />
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="951" />
+    <option name="width" value="978" />
+    <option name="height" value="1039" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectView">
@@ -95,7 +91,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python tests.pytest in testDispersion.py">
+  <component name="RunManager" selected="Python.dispersion">
     <configuration name="dispersion" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="dispersion" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -134,8 +130,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python tests.pytest in testDispersion.py" />
         <item itemvalue="Python.dispersion" />
+        <item itemvalue="Python tests.pytest in testDispersion.py" />
       </list>
     </recent_temporary>
   </component>
@@ -153,34 +149,34 @@
     <servers />
   </component>
   <component name="TestHistory">
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 12m 11s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 12m 22s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 13m 26s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 15m 39s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 21m 09s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 24m 52s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 25m 06s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 25m 26s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
-    <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 25m 48s.xml">
-      <configuration name="pytest in testDispersion.py" configurationId="tests" />
-    </history-entry>
     <history-entry file="pytest_in_testDispersion_py - 2021.11.22 at 16h 29m 51s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 31m 15s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 32m 01s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 32m 56s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 33m 26s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 33m 38s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 33m 48s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 34m 29s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 34m 39s.xml">
+      <configuration name="pytest in testDispersion.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="pytest_in_testDispersion_py - 2022.02.22 at 13h 34m 52s.xml">
       <configuration name="pytest in testDispersion.py" configurationId="tests" />
     </history-entry>
   </component>
@@ -210,18 +206,15 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/dispersion.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="391">
-          <caret line="23" column="130" lean-forward="true" selection-start-line="23" selection-start-column="8" selection-end-line="23" selection-end-column="130" />
-          <folding>
-            <element signature="e#0#31#0" expanded="true" />
-          </folding>
+        <state>
+          <caret column="17" lean-forward="true" selection-start-column="17" selection-end-column="17" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/testDispersion.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="427">
-          <caret line="137" column="26" lean-forward="true" selection-start-line="137" selection-start-column="26" selection-end-line="137" selection-end-column="26" />
+        <state relative-caret-position="87">
+          <caret line="144" column="25" lean-forward="true" selection-start-line="144" selection-start-column="25" selection-end-line="144" selection-end-column="25" />
           <folding>
             <element signature="e#0#15#0" expanded="true" />
           </folding>

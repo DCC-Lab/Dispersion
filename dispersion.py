@@ -9,8 +9,7 @@ class Pulse:
         self.wavelength = wavelength
         self.time = np.linspace(-10000e-15, 10000e-15, 5000) #find a way to define with wavelength and duration
         self.IntensityTime = 1/((self.duration / 2.35482)*np.sqrt(2*np.pi))*np.exp(-self.time**2 / (2*(self.duration / 2.35482)**2))
-        self.IntensityTimeTL = 1 / ((self.duration / 2.35482) * np.sqrt(2 * np.pi)) * np.exp(-self.time ** 2 / (2 * (self.duration / self.TL / 2.35482) ** 2))
-        self.EfieldTime = np.sqrt(self.IntensityTimeTL)
+        self.EfieldTime = np.sqrt(self.IntensityTime)*np.exp(1j/(4*(self.duration / 2.35482)**2)*np.sqrt(self.TL**2 - 1)*self.time**2)
         self.IntensityTimePropagated = []
         self.durationPropagated = 0
         self.EfieldFrequency = None
@@ -110,7 +109,7 @@ class Pulse:
 
 
 if __name__ == "__main__":
-    pulseTest = Pulse(120e-15, 1, 1270e-9)
+    pulseTest = Pulse(120e-15, 2, 1045e-9)
     pulseTest.frequencySpectra
     pulseTest.plotInitialPulse()
     pulseTest.propagate("silica", 0.15)

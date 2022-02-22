@@ -135,5 +135,29 @@ class TestFFTAndPulses(unittest.TestCase):
         I could not make it work. From my understanding FWHM = 2.35482*RMS, so I don't see how the product of RMS width
         can give a larger value."""
 
+    def test09timeBandwithProductNotTL(self):
+        """I want to see if the time bandwidth product calculated with the FFT matches the one given as input when not transform
+        limited, by giving a TL factor that says how much we are over the transform limit."""
+
+
+        T = 10000e-15
+        N = 5000
+        sigma = (100e-15)
+        TL = 1.2
+        t = np.linspace(-T, T, N)
+        dt = 2 * T / N
+        frequencies = np.fft.fftfreq(N, dt)
+
+        temporalIntensity = np.exp(-(t * t) / (2 * sigma * sigma))
+        temporalField = np.sqrt(temporalIntensity)*np.exp(1j/(4 * sigma * sigma)*np.sqrt(TL**2 - 1)*t*t)
+        FourierField = np.fft.fft(temporalField)
+        FourierIntensity = abs(FourierField) ** 2
+        mu = frequencies.dot(FourierIntensity / FourierIntensity.sum())
+        mu2 = np.power(frequencies, 2).dot(FourierIntensity / FourierIntensity.sum())
+        var = mu2 - mu ** 2
+        RMSfreq = np.sqrt(var)
+
+        self.assertAlmostEqual(RMSfreq * sigma * 2.35482 * 2.35482, 0.44*TL, 2)
+
 if __name__ == '__main__':
     unittest.main()
