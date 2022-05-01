@@ -115,12 +115,16 @@ class Pulse:
 
         return self.time, field
 
-    def plotEnvelope(self, axis=None):
+    def drawEnvelope(self, axis=None):
         plt.style.use(
             "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle"
         )
+
+        if axis is None:
+            axis = plt.gca()
+
         timeIsPs = self.time * 1e12
-        plt.plot(timeIsPs, self.fieldEnvelope, "k-")
+        axis.plot(timeIsPs, self.fieldEnvelope, "k-")
         plt.xlabel("Time [ps]")
         plt.ylabel("Field amplitude [arb.u.]")
 
@@ -130,30 +134,30 @@ class Pulse:
             instantPhase,
             instantRadFrequency,
         ) = self.instantRadFrequency()
-        normalizedFrequency = (
+
+        # We want green for the center frequency (+0.33)
+        normalizedFrequencyForColor = (
             -(instantRadFrequency - self.𝝎ₒ) / (5 * 2 * π * self.spectralWidth) + 0.33
         )
 
-        if axis is None:
-            axis = plt.gca()
-
-        instantTimeInPs = instantTime * 1e12
         hsv = cm.get_cmap("hsv", 256)
         M = 128
+
+        instantTimeInPs = instantTime * 1e12
         step = len(instantTimeInPs) // M
         for i in range(0, len(instantTimeInPs) - step, step):
             t1 = instantTimeInPs[i]
             t2 = instantTimeInPs[i + step]
-            f = normalizedFrequency[i + step // 2]
+            c = normalizedFrequencyForColor[i + step // 2]
             e1 = instantEnvelope[i]
             e2 = instantEnvelope[i + step]
             axis.add_patch(
-                Polygon([(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(f))
+                Polygon([(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(c))
             )
         axis.text(
             0.05,
             0.95,
-            "Pulse width : {0:.0f} fs".format(self.temporalWidth * 1e15),
+            "Distance = {2:.1f} mm\n$\Delta t$ : {0:.0f} fs\n$\Delta \omega \\times \Delta t$ : {1:0.2f}".format(self.temporalWidth * 1e15, self.timeBandwidthProduct, self.distancePropagated*1e3),
             transform=axis.transAxes,
             fontsize=14,
             verticalalignment="top",
@@ -205,7 +209,7 @@ if __name__ == "__main__":
     pulse = Pulse(𝛕=100e-15, 𝜆ₒ=800e-9)
 
     print("#\td\t∆t[ps]\t∆𝝎[THz]\tProduct")
-    for j in range(40):
+    for j in range(20):
         print(
             "{0}\t{1:0.3f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
                 j,
@@ -216,9 +220,10 @@ if __name__ == "__main__":
             )
         )
 
-        pulse.plotEnvelope()
+        pulse.drawEnvelope()
         plt.ylim(0, 1)
-        plt.savefig("fig-{0:02d}.png".format(j))
+        plt.savefig("fig-{0:02d}.png".format(j), dpi=600 )
+        # plt.show()
         plt.clf()
 
         pulse.propagate(10e-2)
