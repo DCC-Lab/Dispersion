@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
 
     print("#\td\t∆t[ps]\t∆𝝎[THz]\tProduct")
-    for j in range(20):
+    for j in range(100):
         print(
             "{0}\t{1:0.3f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
                 j,
@@ -241,4 +241,4 @@ if __name__ == "__main__":
         plt.savefig("fig-{0:02d}.png".format(j), dpi=300 )
         pulse.tearDownPlot()
 
-        pulse.propagate(10e-2, pulse.bk7)
+        pulse.propagate(1e-2, pulse.bk7)
