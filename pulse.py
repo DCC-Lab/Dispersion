@@ -4,7 +4,9 @@ import numpy as np
 from scipy.signal import hilbert, chirp
 from matplotlib import cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-
+# You could import materials from Raytracing:
+# from raytracing.materials import *
+# print(Material.all())
 
 # Shortcuts
 I = complex(0, 1)
@@ -24,10 +26,13 @@ class Pulse:
         self.𝝎ₒ = self.kₒ * c
         self.fₒ = self.𝝎ₒ / 2 / π
 
-        t = np.linspace(-𝛕 * S, 𝛕 * S, N)
+        t = self.generateTimeSteps(N, S)
         self.field = np.exp(-(t * t) / (𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
         self.time = t
         self.distancePropagated = 0
+
+    def generateTimeSteps(self, N, S):
+        return np.linspace(-self.𝛕ₒ * S, self.𝛕ₒ * S, N)
 
     @property
     def dt(self):
@@ -81,6 +86,7 @@ class Pulse:
 
         instantRadFrequency = np.extract(instantEnvelope[0:-1] > 0.001, instantRadFrequency)
         instantTime = np.extract(instantEnvelope[0:-1] > 0.001, self.time)
+        instantPhase = np.extract(instantEnvelope[0:-1] > 0.001, instantPhase)
         instantEnvelope = np.extract(instantEnvelope[0:-1] > 0.001, instantEnvelope)
 
         return instantTime, instantEnvelope, instantPhase, instantRadFrequency
@@ -105,7 +111,7 @@ class Pulse:
 
         𝜙 = np.array([2 * π / 𝜆 * indexFct(abs(𝜆)) * d for 𝜆 in self.wavelengths])
 
-        phaseFactor = np.exp(-I * 𝜙)
+        phaseFactor = np.exp(I * 𝜙)
         field = np.fft.fft(self.field)
         field *= phaseFactor
         field = np.fft.ifft(field)
@@ -144,7 +150,21 @@ class Pulse:
         timeIsPs = self.time * 1e12
         axis.plot(timeIsPs, self.fieldEnvelope, "k-")
 
-    def drawInstantFrequency(self, axis=None):
+    def drawField(self, axis=None):
+        if axis is None:
+            axis = plt.gca()
+
+        (
+            instantTime,
+            instantEnvelope,
+            instantPhase,
+            instantRadFrequency,
+        ) = self.instantRadFrequency()
+
+        timeIsPs = instantTime * 1e12
+        axis.plot(timeIsPs, instantEnvelope * np.cos(instantPhase), "k-")
+
+    def drawChirpColour(self, axis=None):
         if axis is None:
             axis = plt.gca()
 
@@ -157,7 +177,7 @@ class Pulse:
 
         # We want green for the center frequency (+0.33)
         normalizedFrequencyForColor = (
-            -(instantRadFrequency - self.𝝎ₒ) / (5 * 2 * π * self.spectralWidth) + 0.33
+            (instantRadFrequency - self.𝝎ₒ) / (5 * 2 * π * self.spectralWidth) + 0.33
         )
 
         hsv = cm.get_cmap("hsv", 256)
@@ -219,26 +239,32 @@ class Pulse:
 if __name__ == "__main__":
 
     pulse = Pulse(𝛕=100e-15, 𝜆ₒ=800e-9)
+    
+    material = pulse.silica
+    totalDistance = 1e-1
+    steps = 10
 
 
-    print("#\td\t∆t[ps]\t∆𝝎[THz]\tProduct")
-    for j in range(100):
+    print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
+    stepDistance = totalDistance/steps
+    for j in range(steps):
         print(
-            "{0}\t{1:0.3f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
+            "{0}\t{1:.1f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
                 j,
-                pulse.distancePropagated,
+                pulse.distancePropagated*1e3,
                 pulse.temporalWidth * 1e12,
                 2 * π * pulse.spectralWidth * 1e-12,
                 pulse.timeBandwidthProduct,
             )
         )
 
-        pulse.setupPlot("Propagation in BK7")
+        pulse.setupPlot("Propagation in {0}".format(material.__func__.__name__))
         pulse.drawEnvelope()
-        pulse.drawInstantFrequency()
+        pulse.drawChirpColour()
+        # pulse.drawField()
 
-        #plt.show() 
+        plt.show() 
         plt.savefig("fig-{0:02d}.png".format(j), dpi=300 )
         pulse.tearDownPlot()
 
-        pulse.propagate(1e-2, pulse.bk7)
+        pulse.propagate(stepDistance, material)
