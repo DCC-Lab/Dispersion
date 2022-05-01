@@ -115,18 +115,38 @@ class Pulse:
 
         return self.time, field
 
-    def drawEnvelope(self, axis=None):
+    def setupPlot(self, title=""):
         plt.style.use(
             "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle"
         )
+        plt.title(title)
+        plt.xlabel("Time [ps]")
+        plt.ylabel("Field amplitude [arb.u.]")
+        plt.ylim(0, 1)
 
+        axis = plt.gca()
+        axis.text(
+            0.05,
+            0.95,
+            "Distance = {2:.0f} mm\n$\Delta t$ = {0:.0f} fs\n$\Delta \omega \\times \Delta t$ = {1:0.2f}".format(self.temporalWidth * 1e15, self.timeBandwidthProduct, self.distancePropagated*1e3),
+            transform=axis.transAxes,
+            fontsize=14,
+            verticalalignment="top",
+        )
+
+    def tearDownPlot(self):
+        plt.clf()
+
+    def drawEnvelope(self, axis=None):
         if axis is None:
             axis = plt.gca()
 
         timeIsPs = self.time * 1e12
         axis.plot(timeIsPs, self.fieldEnvelope, "k-")
-        plt.xlabel("Time [ps]")
-        plt.ylabel("Field amplitude [arb.u.]")
+
+    def drawInstantFrequency(self, axis=None):
+        if axis is None:
+            axis = plt.gca()
 
         (
             instantTime,
@@ -154,14 +174,6 @@ class Pulse:
             axis.add_patch(
                 Polygon([(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(c))
             )
-        axis.text(
-            0.05,
-            0.95,
-            "Distance = {2:.1f} mm\n$\Delta t$ : {0:.0f} fs\n$\Delta \omega \\times \Delta t$ : {1:0.2f}".format(self.temporalWidth * 1e15, self.timeBandwidthProduct, self.distancePropagated*1e3),
-            transform=axis.transAxes,
-            fontsize=14,
-            verticalalignment="top",
-        )
 
     def silica(self, wavelength):
         x = wavelength * 1e6
@@ -208,6 +220,7 @@ if __name__ == "__main__":
 
     pulse = Pulse(𝛕=100e-15, 𝜆ₒ=800e-9)
 
+
     print("#\td\t∆t[ps]\t∆𝝎[THz]\tProduct")
     for j in range(20):
         print(
@@ -220,10 +233,12 @@ if __name__ == "__main__":
             )
         )
 
+        pulse.setupPlot("Propagation in BK7")
         pulse.drawEnvelope()
-        plt.ylim(0, 1)
-        plt.savefig("fig-{0:02d}.png".format(j), dpi=600 )
-        # plt.show()
-        plt.clf()
+        pulse.drawInstantFrequency()
 
-        pulse.propagate(10e-2)
+        #plt.show() 
+        plt.savefig("fig-{0:02d}.png".format(j), dpi=300 )
+        pulse.tearDownPlot()
+
+        pulse.propagate(10e-2, pulse.bk7)
