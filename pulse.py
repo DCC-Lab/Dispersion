@@ -24,11 +24,9 @@ class Pulse:
         self.𝝎ₒ = self.kₒ * c
         self.fₒ = self.𝝎ₒ / 2 / π
 
-        self.time = np.linspace(-𝛕 * S, 𝛕 * S, N)
-
-        self.fieldInTime = np.exp(-(self.time * self.time) / (𝛕 * 𝛕)) * np.cos(
-            self.𝝎ₒ * self.time
-        )
+        t = np.linspace(-𝛕 * S, 𝛕 * S, N)
+        self.field = np.exp(-(t * t) / (𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
+        self.time = t
         self.distancePropagated = 0
 
     @property
@@ -37,7 +35,7 @@ class Pulse:
 
     @property
     def frequencies(self):
-        return np.fft.fftfreq(len(self.fieldInTime), self.dt)
+        return np.fft.fftfreq(len(self.field), self.dt)
 
     @property
     def wavelengths(self):
@@ -45,7 +43,7 @@ class Pulse:
 
     @property
     def spectrum(self):
-        return np.fft.fft(self.fieldInTime)
+        return np.fft.fft(self.field)
 
     @property
     def spectralWidth(self):
@@ -57,7 +55,7 @@ class Pulse:
 
     @property
     def temporalWidth(self):
-        return self.rms(self.time, self.envelope)
+        return self.rms(self.time, self.fieldEnvelope)
 
     def rms(self, x, y):
         sumY = np.sum(y)
@@ -70,26 +68,26 @@ class Pulse:
         return 2 * π * self.spectralWidth * self.temporalWidth
 
     @property
-    def envelope(self):
+    def fieldEnvelope(self):
         return np.abs(self.analyticSignal)
 
-    def instantFrequency(self):
+    def instantRadFrequency(self):
         # Extract envelope and carrier
         analyticSignal = self.analyticSignal
 
         instantEnvelope = np.abs(analyticSignal)
         instantPhase = np.unwrap(np.angle(analyticSignal))
-        instantFrequency = np.diff(instantPhase) * 1 / self.dt
+        instantRadFrequency = np.diff(instantPhase) * 1 / self.dt
 
-        instantFrequency = np.extract(instantEnvelope[0:-1] > 0.001, instantFrequency)
+        instantRadFrequency = np.extract(instantEnvelope[0:-1] > 0.001, instantRadFrequency)
         instantTime = np.extract(instantEnvelope[0:-1] > 0.001, self.time)
         instantEnvelope = np.extract(instantEnvelope[0:-1] > 0.001, instantEnvelope)
 
-        return instantTime, instantEnvelope, instantPhase, instantFrequency
+        return instantTime, instantEnvelope, instantPhase, instantRadFrequency
 
     @property
     def analyticSignal(self):
-        analyticSignal = hilbert(self.fieldInTime.real)
+        analyticSignal = hilbert(self.field.real)
 
         # Center maximum at t=0
         maxIndex = np.argmax(np.abs(analyticSignal))
@@ -101,30 +99,39 @@ class Pulse:
     def propagate(self, d, indexFct=None):
         if indexFct is None:
             indexFct = self.bk7
+
+        if np.mean(self.field[0:10]) > 2e-2:
+            print("Warning: temporal field reaching edges")
+
         𝜙 = np.array([2 * π / 𝜆 * indexFct(abs(𝜆)) * d for 𝜆 in self.wavelengths])
 
         phaseFactor = np.exp(-I * 𝜙)
-        field = np.fft.fft(self.fieldInTime)
+        field = np.fft.fft(self.field)
         field *= phaseFactor
         field = np.fft.ifft(field)
 
-        self.fieldInTime = field
+        self.field = field
         self.distancePropagated += d
 
         return self.time, field
 
     def plotEnvelope(self, axis=None):
+        plt.style.use(
+            "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle"
+        )
         timeIsPs = self.time * 1e12
-        plt.plot(timeIsPs, self.envelope, 'k-')
+        plt.plot(timeIsPs, self.fieldEnvelope, "k-")
+        plt.xlabel("Time [ps]")
+        plt.ylabel("Field amplitude [arb.u.]")
 
         (
             instantTime,
             instantEnvelope,
             instantPhase,
-            instantFrequency,
-        ) = self.instantFrequency()
+            instantRadFrequency,
+        ) = self.instantRadFrequency()
         normalizedFrequency = (
-            -(instantFrequency - self.𝝎ₒ) / (5 * 2 * π * self.spectralWidth) + 0.33
+            -(instantRadFrequency - self.𝝎ₒ) / (5 * 2 * π * self.spectralWidth) + 0.33
         )
 
         if axis is None:
@@ -137,12 +144,20 @@ class Pulse:
         for i in range(0, len(instantTimeInPs) - step, step):
             t1 = instantTimeInPs[i]
             t2 = instantTimeInPs[i + step]
-            f  = normalizedFrequency[i + step // 2]
+            f = normalizedFrequency[i + step // 2]
             e1 = instantEnvelope[i]
             e2 = instantEnvelope[i + step]
             axis.add_patch(
                 Polygon([(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(f))
             )
+        axis.text(
+            0.05,
+            0.95,
+            "Pulse width : {0:.0f} fs".format(self.temporalWidth * 1e15),
+            transform=axis.transAxes,
+            fontsize=14,
+            verticalalignment="top",
+        )
 
     def silica(self, wavelength):
         x = wavelength * 1e6
@@ -190,12 +205,19 @@ if __name__ == "__main__":
     pulse = Pulse(𝛕=100e-15, 𝜆ₒ=800e-9)
 
     print("#\td\t∆t[ps]\t∆𝝎[THz]\tProduct")
-    for j in range(10):
-        print("{0}\t{1:0.3f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(j, pulse.distancePropagated, pulse.temporalWidth*1e12, 2*π*pulse.spectralWidth*1e-12, pulse.timeBandwidthProduct))
+    for j in range(40):
+        print(
+            "{0}\t{1:0.3f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
+                j,
+                pulse.distancePropagated,
+                pulse.temporalWidth * 1e12,
+                2 * π * pulse.spectralWidth * 1e-12,
+                pulse.timeBandwidthProduct,
+            )
+        )
 
         pulse.plotEnvelope()
         plt.ylim(0, 1)
-        plt.xlim(-5*pulse.𝛕ₒ*1e12, 5*pulse.𝛕ₒ*1e12)
         plt.savefig("fig-{0:02d}.png".format(j))
         plt.clf()
 
