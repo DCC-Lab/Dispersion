@@ -4,6 +4,7 @@ import numpy as np
 from scipy.signal import hilbert, chirp
 from matplotlib import cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
 # You could import materials from Raytracing:
 # from raytracing.materials import *
 # print(Material.all())
@@ -84,7 +85,9 @@ class Pulse:
         instantPhase = np.unwrap(np.angle(analyticSignal))
         instantRadFrequency = np.diff(instantPhase) * 1 / self.dt
 
-        instantRadFrequency = np.extract(instantEnvelope[0:-1] > 0.001, instantRadFrequency)
+        instantRadFrequency = np.extract(
+            instantEnvelope[0:-1] > 0.001, instantRadFrequency
+        )
         instantTime = np.extract(instantEnvelope[0:-1] > 0.001, self.time)
         instantPhase = np.extract(instantEnvelope[0:-1] > 0.001, instantPhase)
         instantEnvelope = np.extract(instantEnvelope[0:-1] > 0.001, instantEnvelope)
@@ -134,7 +137,11 @@ class Pulse:
         axis.text(
             0.05,
             0.95,
-            "Distance = {2:.0f} mm\n$\Delta t$ = {0:.0f} fs\n$\Delta \omega \\times \Delta t$ = {1:0.2f}".format(self.temporalWidth * 1e15, self.timeBandwidthProduct, self.distancePropagated*1e3),
+            "Distance = {2:.0f} mm\n$\Delta t$ = {0:.0f} fs\n$\Delta \omega \\times \Delta t$ = {1:0.2f}".format(
+                self.temporalWidth * 1e15,
+                self.timeBandwidthProduct,
+                self.distancePropagated * 1e3,
+            ),
             transform=axis.transAxes,
             fontsize=14,
             verticalalignment="top",
@@ -176,11 +183,11 @@ class Pulse:
         ) = self.instantRadFrequency()
 
         # We want green for the center frequency (+0.33)
-        normalizedFrequencyForColor = (
-            (instantRadFrequency - self.𝝎ₒ) / (5 * 2 * π * self.spectralWidth) + 0.33
-        )
+        normalizedFrequencyForColor = (instantRadFrequency - self.𝝎ₒ) / (
+            5 * 2 * π * self.spectralWidth
+        ) + 0.33
 
-        hsv = cm.get_cmap("hsv", 256)
+        hsv = cm.get_cmap("hsv", 64)
         M = 128
 
         instantTimeInPs = instantTime * 1e12
@@ -235,23 +242,39 @@ class Pulse:
             + 1.64447552 / (1 - 147.468793 / x**2)
         ) ** 0.5
 
+    def water(self, wavelength):
+        x = wavelength * 1e6
+        if x < 0.3:
+            x = 0.3
+        elif x > 2.5:
+            x = 2.5
+
+        x2 = x * x
+        n = (
+            1
+            + 5.672526103e-1 / (1 - 5.085550461e-3 / x2)
+            + 1.736581125e-1 / (1 - 1.814938654e-2 / x2)
+            + 2.121531502e-2 / (1 - 2.617260739e-2 / x2)
+            + 1.138493213e-1 / (1 - 1.073888649e1 / x2)
+        ) ** 0.5
+        return n
+
 
 if __name__ == "__main__":
 
     pulse = Pulse(𝛕=100e-15, 𝜆ₒ=800e-9)
-    
-    material = pulse.silica
-    totalDistance = 1e-1
+
+    material = pulse.bk7
+    totalDistance = 1
     steps = 10
 
-
     print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
-    stepDistance = totalDistance/steps
+    stepDistance = totalDistance / steps
     for j in range(steps):
         print(
             "{0}\t{1:.1f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
                 j,
-                pulse.distancePropagated*1e3,
+                pulse.distancePropagated * 1e3,
                 pulse.temporalWidth * 1e12,
                 2 * π * pulse.spectralWidth * 1e-12,
                 pulse.timeBandwidthProduct,
@@ -263,8 +286,8 @@ if __name__ == "__main__":
         pulse.drawChirpColour()
         # pulse.drawField()
 
-        plt.show() 
-        plt.savefig("fig-{0:02d}.png".format(j), dpi=300 )
+        plt.show()
+        plt.savefig("fig-{0:02d}.png".format(j), dpi=300)
         pulse.tearDownPlot()
 
         pulse.propagate(stepDistance, material)
