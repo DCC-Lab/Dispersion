@@ -131,7 +131,7 @@ class Pulse:
         plt.title(title)
         plt.xlabel("Time [ps]")
         plt.ylabel("Field amplitude [arb.u.]")
-        plt.ylim(0, 1)
+        plt.ylim(-1, 1)
 
         axis = plt.gca()
         axis.text(
@@ -262,11 +262,23 @@ class Pulse:
 
 if __name__ == "__main__":
 
-    pulse = Pulse(𝛕=100e-15, 𝜆ₒ=800e-9)
+    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=800e-9)
 
+    # All adjustable parameters below
+
+    # Material propertiues and distances, steps
     material = pulse.bk7
-    totalDistance = 1
-    steps = 10
+    totalDistance = 1e-2
+    steps = 40
+
+    # What to display on graph in addition to envelope
+    adjustTimeScale = False
+    showCarrier = True
+
+    # Save graph (set to None to not save)
+    filenameTemplate = "fig-{0:02d}.png" # Can use PDF but PNG for making movies with Quicktime Player
+
+    # End adjustable parameters
 
     print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
     stepDistance = totalDistance / steps
@@ -284,10 +296,19 @@ if __name__ == "__main__":
         pulse.setupPlot("Propagation in {0}".format(material.__func__.__name__))
         pulse.drawEnvelope()
         pulse.drawChirpColour()
-        # pulse.drawField()
+    
+        if showCarrier:
+            pulse.drawField()
 
-        plt.show()
-        plt.savefig("fig-{0:02d}.png".format(j), dpi=300)
+        if adjustTimeScale:
+            𝛕 = pulse.temporalWidth*1e12
+            plt.xlim(-5*𝛕, 5*𝛕)
+        
+        plt.draw()
+        plt.pause(0.001)
+
+        if filenameTemplate is not None:
+            plt.savefig(filenameTemplate.format(j), dpi=300)
         pulse.tearDownPlot()
 
         pulse.propagate(stepDistance, material)
