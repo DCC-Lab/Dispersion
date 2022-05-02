@@ -271,11 +271,11 @@ if __name__ == "__main__":
     totalDistance = 1e-2
     steps = 40
 
-    # What to display on graph in addition to envelope
+    # What to display on graph in addition to envelope?
     adjustTimeScale = False
     showCarrier = True
 
-    # Save graph (set to None to not save)
+    # Save graph? (set to None to not save)
     filenameTemplate = "fig-{0:02d}.png" # Can use PDF but PNG for making movies with Quicktime Player
 
     # End adjustable parameters
