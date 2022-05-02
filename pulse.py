@@ -262,9 +262,9 @@ class Pulse:
 
 if __name__ == "__main__":
 
-    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=800e-9)
 
     # All adjustable parameters below
+    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=800e-9)
 
     # Material propertiues and distances, steps
     material = pulse.bk7
