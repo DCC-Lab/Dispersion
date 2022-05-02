@@ -16,24 +16,33 @@ c = 3e8
 
 
 class Pulse:
-    def __init__(self, 𝛕, 𝜆ₒ):
+    def __init__(self, 𝛕 = None, 𝜆ₒ = None, field=None, time=None):
+
+        if 𝛕 is not None:
+            self.𝜆ₒ = 𝜆ₒ
+            self.kₒ = 2 * π / 𝜆ₒ
+            self.𝝎ₒ = self.kₒ * c
+            self.fₒ = self.𝝎ₒ / 2 / π
+
+            self.time, self.field = self.computeField(𝛕, 𝜆ₒ)
+        else:
+            self.𝜆ₒ = None
+            self.kₒ = None
+            self.𝝎ₒ = None
+            self.fₒ = None
+
+            self.field = field
+            self.time = time
+
+        self.distancePropagated = 0
+
+    def computeField(self, 𝛕ₒ, 𝜆ₒ):
         N = 1024 * 16
         S = 40
 
-        self.N = N
-        self.𝛕ₒ = 𝛕
-        self.𝜆ₒ = 𝜆ₒ
-        self.kₒ = 2 * π / 𝜆ₒ
-        self.𝝎ₒ = self.kₒ * c
-        self.fₒ = self.𝝎ₒ / 2 / π
-
-        t = self.generateTimeSteps(N, S)
-        self.field = np.exp(-(t * t) / (𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
-        self.time = t
-        self.distancePropagated = 0
-
-    def generateTimeSteps(self, N, S):
-        return np.linspace(-self.𝛕ₒ * S, self.𝛕ₒ * S, N)
+        t = np.linspace(-𝛕ₒ * S, 𝛕ₒ * S, N)
+        field = np.exp(-(t * t) / (𝛕ₒ * 𝛕ₒ)) * np.cos(self.𝝎ₒ * t)
+        return t, field        
 
     @property
     def dt(self):
