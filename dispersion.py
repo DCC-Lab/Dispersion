@@ -2,8 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sympy import *
 
+
+# This file is deprecated.  Use pulse.py instead.
 class Pulse:
     def __init__(self, duration, TL, wavelength):
+        print("This file is deprecated.  Use pulse.py instead and its Pulse class.")
         self.duration = duration
         self.TL = TL
         self.wavelength = wavelength
