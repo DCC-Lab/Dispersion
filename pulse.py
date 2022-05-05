@@ -21,6 +21,7 @@ class Pulse:
         S = 40
 
         self.N = N
+        self.S = S
         self.𝛕ₒ = 𝛕
         self.𝜆ₒ = 𝜆ₒ
         self.kₒ = 2 * π / 𝜆ₒ
@@ -109,8 +110,13 @@ class Pulse:
         if indexFct is None:
             indexFct = self.bk7
 
-        if np.mean(self.field[0:10]) > 2e-2:
+        if np.mean(self.fieldEnvelope[0:10]) > 2e-4:
+            self.S += self.S
+            self.N += self.N
+            self.time = self.generateTimeSteps(self.N, self.S)
+            self.field = np.pad(self.field, (int(self.N/4),), 'constant', constant_values=(0,))
             print("Warning: temporal field reaching edges")
+
 
         𝜙 = np.array([2 * π / 𝜆 * indexFct(abs(𝜆)) * d for 𝜆 in self.wavelengths])
 
@@ -126,8 +132,7 @@ class Pulse:
 
     def setupPlot(self, title=""):
         plt.style.use(
-            "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle"
-        )
+            "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle")
         plt.title(title)
         plt.xlabel("Time [ps]")
         plt.ylabel("Field amplitude [arb.u.]")
@@ -268,7 +273,7 @@ if __name__ == "__main__":
 
     # Material propertiues and distances, steps
     material = pulse.bk7
-    totalDistance = 1e-2
+    totalDistance = 0.025
     steps = 40
 
     # What to display on graph in addition to envelope?
