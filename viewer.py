@@ -15,6 +15,13 @@ class Viewer:
         self.xlabel = "Time [ps]"
         self.ylabel = "Field amplitude [arb.u.]"
 
+        self.showChirp = True
+        self.showCarrier = False
+        self.adjustTimeScale = True
+
+    def showPropagation(self, totalDistance, material, steps,):
+        self.pulse.doPropagation(totalDistance, material, steps=steps)
+
     def beginPlot(self):
         self.figure = plt.subplot()
 
@@ -43,11 +50,12 @@ class Viewer:
         plt.title(self.title)
         plt.xlabel(self.xlabel)
         plt.ylabel(self.ylabel)
+        axis.set_ylim(0,1)
 
         axis.text(
             0.05,
             0.95,
-            "Distance = {2:.0f} mm\n$\Delta t$ = {0:.0f} fs\n$\Delta \omega \\times \Delta t$ = {1:0.2f}".format(
+            "Distance = {2:.1f} mm\n$\Delta t$ = {0:.0f} fs\n$\Delta \omega \\times \Delta t$ = {1:0.2f}".format(
                 self.pulse.temporalWidth * 1e15,
                 self.pulse.timeBandwidthProduct,
                 self.pulse.distancePropagated * 1e3,
@@ -129,3 +137,45 @@ class Viewer:
             axis.add_patch(
                 Polygon([(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(c))
             )
+
+if __name__ == "__main__":
+    from viewer import *
+
+    # All adjustable parameters below
+    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=800e-9, S=100)
+
+    # Material properties and distances, steps
+    material = bk7
+    totalDistance = 1e-3
+    steps = 400
+
+    # What to display on graph in addition to envelope?
+    adjustTimeScale = True
+    showCarrier = True
+    showChirpColour = True
+    # Save graph? (set to None to not save)
+    filenameTemplate = "fig-{0:03d}.png" # Can use PDF but PNG for making movies with Quicktime Player
+
+    # End adjustable parameters
+
+    viewer = Viewer(pulse, "Propagation in {0}".format(material.__name__))
+    viewer.beginPlot()
+
+    print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
+    stepDistance = totalDistance / steps
+    for j in range(steps):
+        print(
+            "{0}\t{1:.2f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
+                j,
+                pulse.distancePropagated * 1e3,
+                pulse.temporalWidth * 1e12,
+                2 * π * pulse.spectralWidth * 1e-12,
+                pulse.timeBandwidthProduct,
+            )
+        )
+
+        viewer.draw(None, showChirpColour, showCarrier, adjustTimeScale, filenameTemplate.format(j))
+        pulse.propagate(stepDistance, material)
+
+    viewer.endPlot()
+

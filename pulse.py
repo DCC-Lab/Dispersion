@@ -1,3 +1,8 @@
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle, Polygon
+from matplotlib import cm
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
 import numpy as np
 from scipy.signal import hilbert, chirp
 from materials import *
@@ -12,11 +17,7 @@ I = complex(0, 1)
 c = 3e8
 
 class Pulse:
-    def __init__(self, 𝛕, 𝜆ₒ):
-        N = 1024 * 16
-        S = 40
-
-        self.N = N
+    def __init__(self, 𝛕, 𝜆ₒ, S=40):
         self.𝛕ₒ = 𝛕
         self.𝜆ₒ = 𝜆ₒ
         self.kₒ = 2 * π / 𝜆ₒ
@@ -26,14 +27,11 @@ class Pulse:
         dt = 1/self.fₒ/16
         T = S * self.𝛕ₒ
         N = int(2*T / dt)
-        print(N)
-        t = np.linspace(-T, T, N)
+        t = np.linspace(-T, T, N, endpoint=True)
         self.field = np.exp(-(t * t) / (𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
         self.time = t
         self.distancePropagated = 0
-
-    def generateTimeSteps(self, N, S):
-        return np.linspace(-self.𝛕ₒ * S, self.𝛕ₒ * S, N)
+        self.globalPhase = 0
 
     @property
     def dt(self):
@@ -41,7 +39,7 @@ class Pulse:
 
     @property
     def frequencies(self):
-        return np.fft.fftfreq(len(self.field), self.dt)
+        return np.fft.fftfreq(len(self.time), self.dt)
 
     @property
     def wavelengths(self):
@@ -105,16 +103,29 @@ class Pulse:
         analyticSignal = np.roll(analyticSignal, deltaRoll)
         return analyticSignal
 
-    def propagate(self, d, indexFct=None):
-        if indexFct is None:
-            indexFct = bk7
+    def doPropagation(self, totalDistance, indexFct=None, steps=20):
+        stepDistance = totalDistance / steps
+        
+        print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
+        for j in range(steps):
+            print(
+                "{0}\t{1:.3f}\t{2:0.4f}\t{3:0.4f}\t{4:0.3f}".format(
+                    j,
+                    self.distancePropagated * 1e3,
+                    self.temporalWidth * 1e12,
+                    2 * π * self.spectralWidth * 1e-12,
+                    self.timeBandwidthProduct,
+                )
+            )
 
-        if np.mean(self.field[0:10]) > 2e-2:
-            print("Warning: temporal field reaching edges")
+            self.propagate(stepDistance, material)
 
+
+    def propagate(self, d, indexFct):
         𝜙 = np.array([2 * π / 𝜆 * indexFct(abs(𝜆)) * d for 𝜆 in self.wavelengths])
 
-        phaseFactor = np.exp(I * 𝜙)
+        phaseFactor = np.exp(I * 𝜙 )
+
         field = np.fft.fft(self.field)
         field *= phaseFactor
         field = np.fft.ifft(field)
@@ -126,43 +137,14 @@ class Pulse:
 
 
 if __name__ == "__main__":
-    from viewer import *
-
     # All adjustable parameters below
-    pulse = Pulse(𝛕=10e-15, 𝜆ₒ=800e-9)
+    pulse = Pulse(𝛕=50e-15, 𝜆ₒ=800e-9)
 
     # Material properties and distances, steps
     material = bk7
-    totalDistance = 0.3e-2
-    steps = 20
-
-    # What to display on graph in addition to envelope?
-    adjustTimeScale = True
-    showCarrier = True
-    showChirpColour = True
-    # Save graph? (set to None to not save)
-    filenameTemplate = "fig-{0:03d}.png" # Can use PDF but PNG for making movies with Quicktime Player
+    totalDistance = 1
+    steps = 100
 
     # End adjustable parameters
 
-    viewer = Viewer(pulse, "Propagation in {0}".format(material.__name__))
-    viewer.beginPlot()
-
-    print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
-    stepDistance = totalDistance / steps
-    for j in range(steps):
-        print(
-            "{0}\t{1:.1f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
-                j,
-                pulse.distancePropagated * 1e3,
-                pulse.temporalWidth * 1e12,
-                2 * π * pulse.spectralWidth * 1e-12,
-                pulse.timeBandwidthProduct,
-            )
-        )
-
-        viewer.draw(None, showChirpColour, showCarrier, adjustTimeScale, filenameTemplate.format(j))
-        pulse.propagate(stepDistance, material)
-
-    viewer.endPlot()
-
+    pulse.doPropagation(totalDistance, indexFct=material, steps=steps)
