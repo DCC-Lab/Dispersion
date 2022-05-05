@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Labels</key>
+	<string>Distance in BK7 [m]
+Pulse width [ps]
+10 fs
+50 fs
+100 fs
+</string>
+	<key>Text</key>
+	<string></string>
+</dict>
+</plist>
