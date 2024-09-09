@@ -106,9 +106,26 @@ class Pulse:
         analyticSignal = np.roll(analyticSignal, deltaRoll)
         return analyticSignal
 
+<<<<<<< Updated upstream
     def propagate(self, d, indexFct=None):
         if indexFct is None:
             indexFct = self.bk7
+=======
+    def doPropagation(self, totalDistance, indexFct=None, steps=20):
+        stepDistance = totalDistance / steps
+        
+        print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
+        for j in range(steps):
+            print(
+                "{0}\t{1:.3f}\t{2:0.5f}\t{3:0.4f}\t{4:0.3f}".format(
+                    j,
+                    self.distancePropagated * 1e3,
+                    self.temporalWidth * 1e12,
+                    2 * π * self.spectralWidth * 1e-12,
+                    self.timeBandwidthProduct,
+                )
+            )
+>>>>>>> Stashed changes
 
         if np.mean(self.fieldEnvelope[0:10]) > 2e-4:
             self.S += self.S
@@ -266,6 +283,11 @@ class Pulse:
 
 
 if __name__ == "__main__":
+<<<<<<< Updated upstream
+=======
+    # All adjustable parameters below
+    pulse = Pulse(𝛕=100e-15, 𝜆ₒ=800e-9)
+>>>>>>> Stashed changes
 
 
     # All adjustable parameters below

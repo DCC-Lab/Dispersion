@@ -90,7 +90,7 @@ class Pulse:
             ax.set_ylabel('Electric field intensity (arbitrary units)')
 
         plt.tight_layout()
-        plt.savefig('time-bandwidth-product.png', dpi=200)
+        plt.savefig('time-bandwidth-product.png', dpi=500)
         plt.show()
 
     def plotPropagatedPulse(self):
@@ -100,21 +100,21 @@ class Pulse:
         PropagatedCentered = np.append(self.IntensityTimePropagated[PropagatedShift:], self.IntensityTimePropagated[:PropagatedShift])
 
         fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-        ax.set_title('Time domain')
+        ax.set_title('Propagation through 19.6cm of silica')
         ax.plot(self.time, self.IntensityTime/max(self.IntensityTime), label="Original pulse \nDuration = %.1f fs"%(self.duration*1e15))
-        ax.plot(self.time, PropagatedCentered/max(self.IntensityTime), label="Propagated pulse \nDuration = %.1f fs"%(self.durationPropagated*1e15))
+        ax.plot(self.time, PropagatedCentered/max(self.IntensityTime), label="Propagated pulse \nDuration = %.1f fs \nChirp rate = %.3f nm/fs"%(self.durationPropagated*1e15, (self.FWHMwavelength*10**9)/(self.durationPropagated*1e15)))
         ax.set_xlim(-2*float(self.durationPropagated), 2*float(self.durationPropagated))
         ax.set_xlabel('Time (sec)')
         ax.legend(fontsize=8)
         ax.set_ylabel('Electric field intensity (arbitrary units)')
+        plt.savefig("propagate.png", dpi=500)
         plt.tight_layout()
         plt.show()
 
 
 if __name__ == "__main__":
-    pulseTest = Pulse(120e-15, 2, 1045e-9)
+    pulseTest = Pulse(76e-15, 1.2, 793e-9)
     pulseTest.frequencySpectra
     pulseTest.plotInitialPulse()
-    pulseTest.propagate("silica", 0.15)
-    #pulseTest.propagate("SF10", 0.05)
+    pulseTest.propagate("silica", 0.09)
     pulseTest.plotPropagatedPulse()

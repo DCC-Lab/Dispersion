@@ -8,8 +8,15 @@
       <change beforePath="$PROJECT_DIR$/.idea/dispersion.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dispersion.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+<<<<<<< Updated upstream
       <change beforePath="$PROJECT_DIR$/pulse.py" beforeDir="false" afterPath="$PROJECT_DIR$/pulse.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/time-bandwidth-product.png" beforeDir="false" afterPath="$PROJECT_DIR$/time-bandwidth-product.png" afterDir="false" />
+=======
+      <change beforePath="$PROJECT_DIR$/dispersion.py" beforeDir="false" afterPath="$PROJECT_DIR$/dispersion.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pulse.py" beforeDir="false" afterPath="$PROJECT_DIR$/pulse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/time-bandwidth-product.png" beforeDir="false" afterPath="$PROJECT_DIR$/time-bandwidth-product.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/viewer.py" beforeDir="false" afterPath="$PROJECT_DIR$/viewer.py" afterDir="false" />
+>>>>>>> Stashed changes
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -26,19 +33,52 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+<<<<<<< Updated upstream
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectId" id="28cAzzHH75RsumtSocAvhn3mSGP" />
+=======
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/testDispersion.py" />
+        <option value="$PROJECT_DIR$/dispersion.py" />
+      </list>
+    </option>
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="951" />
+    <option name="width" value="978" />
+    <option name="height" value="1039" />
+  </component>
+  <component name="ProjectId" id="2Lh5WcKjx2dsoLYQvng3dk6DpCt" />
+>>>>>>> Stashed changes
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
+<<<<<<< Updated upstream
   <component name="PropertiesComponent">
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RunManager" selected="Python.pulse">
+=======
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
+  }
+}</component>
+  <component name="RunManager" selected="Python.dispersion">
+>>>>>>> Stashed changes
     <configuration name="dispersion" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="dispersion" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -81,6 +121,30 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+<<<<<<< Updated upstream
+=======
+    <configuration name="viewer" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="dispersion" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/viewer.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+>>>>>>> Stashed changes
     <configuration name="pytest in testDispersion.py" type="tests" factoryName="py.test" temporary="true" nameIsGenerated="true">
       <module name="dispersion" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -106,6 +170,8 @@
       <list>
         <item itemvalue="Python.pulse" />
         <item itemvalue="Python.dispersion" />
+        <item itemvalue="Python.pulse" />
+        <item itemvalue="Python.viewer" />
         <item itemvalue="Python tests.pytest in testDispersion.py" />
       </list>
     </recent_temporary>
