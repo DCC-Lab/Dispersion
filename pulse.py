@@ -246,6 +246,19 @@ class Pulse:
             + 0.256287842 / (1 - 0.0595736775 / x**2)
             + 1.64447552 / (1 - 147.468793 / x**2)
         ) ** 0.5
+    
+    def sf57(self, wavelength):
+        x = wavelength * 1e6
+        if x < 0.3:
+            x = 0.3
+        elif x > 2.5:
+            x = 2.5
+        return (
+            1
+            + 1.81651371 / (1 - 0.0143704198 / x**2)
+            + 0.428893641 / (1 - 0.0592801172 / x**2)
+            + 1.07186278 / (1 - 121.419942 / x**2)
+        ) ** 0.5
 
     def water(self, wavelength):
         x = wavelength * 1e6
@@ -269,16 +282,16 @@ if __name__ == "__main__":
 
 
     # All adjustable parameters below
-    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=800e-9)
+    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=805e-9)
 
     # Material propertiues and distances, steps
-    material = pulse.bk7
+    material = pulse.sf57
     totalDistance = 0.025
     steps = 40
 
     # What to display on graph in addition to envelope?
     adjustTimeScale = False
-    showCarrier = True
+    showCarrier = False
 
     # Save graph? (set to None to not save)
     filenameTemplate = "fig-{0:02d}.png" # Can use PDF but PNG for making movies with Quicktime Player
