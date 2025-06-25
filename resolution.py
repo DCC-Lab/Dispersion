@@ -65,3 +65,6 @@ print(round(𝚫𝛎0,2), round(𝚫𝛎1,2))  # we get the same intervals, whic
 # print(f'{int(𝜏f*10**-12/𝜏1)}x')
 # This method makes no sense because the chirp makes it so the whole bandwidth is no longer mixed everywhere
 # we still need a certain band of comparison...
+
+# The measure will be done with the FWHM of the frequency domain gaussian curve
+# we look for the d from 0 in propagate fct in pulse class that corresponds minimally to the FWHM in frequency of the picoTrain pulses without rod
