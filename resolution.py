@@ -1,5 +1,7 @@
 import numpy as np
 import math
+from pulse import Pulse
+import matplotlib.pyplot as plt
 
 
 # review how to compute the TBP 
@@ -68,3 +70,9 @@ print(round(𝚫𝛎0,2), round(𝚫𝛎1,2))  # we get the same intervals, whic
 
 # The measure will be done with the FWHM of the frequency domain gaussian curve
 # we look for the d from 0 in propagate fct in pulse class that corresponds minimally to the FWHM in frequency of the picoTrain pulses without rod
+
+
+# pulse = Pulse(𝛕=100e-15, 𝜆ₒ=805e-9)
+pulse = Pulse(6e-12, 1045e-9)  # picoTRAIN as resolution reference
+plt.plot(pulse.spectrum)
+plt.show()
