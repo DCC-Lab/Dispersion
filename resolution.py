@@ -2,6 +2,7 @@ import numpy as np
 import math
 
 
+# review how to compute the TBP 
 TBP = 0.44  # time-bandwidth product for gaussian pulse shape
 𝜏0 = 6*10**-12  # for picosecond pulses with the picoTRAIN laser (goal)
 𝜏1 = 100*10**-15  # for femtosecond pulses with Ti:Saph (current)

@@ -115,6 +115,6 @@ if __name__ == "__main__":
     pulseTest = Pulse(120e-15, 2, 1045e-9)
     pulseTest.frequencySpectra
     pulseTest.plotInitialPulse()
-    pulseTest.propagate("silica", 0.15)
-    #pulseTest.propagate("SF10", 0.05)
+    #pulseTest.propagate("silica", 0.15)
+    pulseTest.propagate("SF10", 0.05)
     pulseTest.plotPropagatedPulse()

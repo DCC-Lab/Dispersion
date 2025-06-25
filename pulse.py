@@ -282,11 +282,11 @@ if __name__ == "__main__":
 
 
     # All adjustable parameters below
-    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=805e-9)
+    pulse = Pulse(𝛕=100e-15, 𝜆ₒ=805e-9)
 
     # Material propertiues and distances, steps
     material = pulse.sf57
-    totalDistance = 0.025
+    totalDistance = 0.1
     steps = 40
 
     # What to display on graph in addition to envelope?
