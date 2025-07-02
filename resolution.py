@@ -16,7 +16,7 @@ def convert(wave):  # wavenumber to and from wavelength
     return 10**7/wave
 
 𝛎f = convert(𝝺f*10**9)  # wavenumber of the fixed output at 1045 nm
-𝝺w = convert(3200+𝛎f) # wavelength of interest for CARS on water with 1045 nm fixed output
+𝝺w = convert(3350+𝛎f) # wavelength of interest for CARS on water with 1045 nm fixed output
 
 print(f'{int(𝝺w)} nm')
 
@@ -30,24 +30,15 @@ def 𝚫𝝺(𝝺, fbw):  # wavelength bandwidth in nm
     return 𝝺**2/c*fbw*10**9
 
 𝚫𝝺0 = 𝚫𝝺(𝝺m, 𝚫𝛎0)  # for 6 ps
-𝚫𝝺1 = 𝚫𝝺(𝝺m, 𝚫𝛎1)  # for 100 fs
+𝚫𝝺1 = 𝚫𝝺(𝝺f, 𝚫𝛎1)  # for 100 fs
 
 print(np.round(𝚫𝝺0/2,2), np.round(𝚫𝝺1/2,2))
-
-# wanted length of Ti:Saph pulse elongated with glass rod in ps
-𝜏f = 𝚫𝝺1*𝜏0/𝚫𝝺0*10**12
-
-print(f'{int(𝜏f)} ps')  # makes no sense, way too big
 
 # try again in wavenumber intervals
 𝚫𝛎0 = convert(𝝺m*10**9-𝚫𝝺0/2)-convert(𝝺m*10**9+𝚫𝝺0/2)  # wavenumber bandwidth in cm-1 for a ps pulse
 𝚫𝛎1 = convert(𝝺m*10**9-𝚫𝝺1/2)-convert(𝝺m*10**9+𝚫𝝺1/2)  # wavenumber bandwidth in cm-1 for a fs pulse
 
 print(round(𝚫𝛎0,2), round(𝚫𝛎1,2))
-
-𝜏f = 𝚫𝛎1*𝜏0/𝚫𝛎0*10**12
-
-print(f'{int(𝜏f)} ps')  # we get the exact same result of 360 ps
 
 
 # what if I try getting the wavenumber interval directly
@@ -59,20 +50,16 @@ def WNBandwidth(freq):
 
 print(round(𝚫𝛎0,2), round(𝚫𝛎1,2))  # we get the same intervals, which makes sense
 
-# So it seems we can't realistically get the same spectral resolution with the femtosecond laser as with the picosecond one. What minimal resolution could we then expect?
-# This is considering all wavelengths will be continously and linearly chirped within the pulse, which is not actually true.
-# But then, we get different resolutions depending if we synchronize with the beginning or the end of the pulse?
-# How else can we measure the spectral resolution? What was used in Pegoraro paper?
 
-# print(f'{int(𝜏f*10**-12/𝜏1)}x')
-# This method makes no sense because the chirp makes it so the whole bandwidth is no longer mixed everywhere
-# we still need a certain band of comparison...
+# we need the temporal resolution of the detection system
+# we can compute d𝜏/d𝝺 which is a function of 𝝺 representing the group delay slope at different wavelength [ps/nm or fs/nm]
+# group delay is d𝜏/d𝝺=d𝜏/dω*dω/d𝝺 using ω=2𝛑c/𝝺
 
-# The measure will be done with the FWHM of the frequency domain gaussian curve
-# we look for the d from 0 in propagate fct in pulse class that corresponds minimally to the FWHM in frequency of the picoTrain pulses without rod
+# what would be an equivalent of the temporal resolution with focusing CARS?
 
 
 # pulse = Pulse(𝛕=100e-15, 𝜆ₒ=805e-9)
 pulse = Pulse(6e-12, 1045e-9)  # picoTRAIN as resolution reference
-plt.plot(pulse.spectrum)
+# plt.plot(pulse.spectrum)
+plt.plot(pulse.fieldEnvelope)
 plt.show()
