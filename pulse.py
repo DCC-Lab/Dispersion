@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Polygon
 import numpy as np
 from scipy.signal import hilbert, chirp
-from matplotlib import cm
+from matplotlib import colormaps
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 # You could import materials from Raytracing:
@@ -192,7 +192,7 @@ class Pulse:
             5 * 2 * π * self.spectralWidth
         ) + 0.33
 
-        hsv = cm.get_cmap("hsv", 64)
+        hsv = colormaps["hsv"]
         M = 128
 
         instantTimeInPs = instantTime * 1e12
@@ -278,7 +278,7 @@ if __name__ == "__main__":
 
     # What to display on graph in addition to envelope?
     adjustTimeScale = False
-    showCarrier = True
+    showCarrier = False
 
     # Save graph? (set to None to not save)
     filenameTemplate = "fig-{0:02d}.png" # Can use PDF but PNG for making movies with Quicktime Player
