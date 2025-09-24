@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 
 
 # review how to compute the TBP 
-TBP = 0.44  # time-bandwidth product for gaussian pulse shape
+TBP = 0.44  # time-bandwidth product for gaussian pulse shape (Fourier transformed limited)
+TBP = 0.315  # time-bandwidth product for sech^2 pulse shape (Fourier transformed limited)
 𝜏0 = 6*10**-12  # for picosecond pulses with the picoTRAIN laser (goal)
 𝜏1 = 100*10**-15  # for femtosecond pulses with Ti:Saph (current)
 c = 2.998*10**8  # light speed in m/s
@@ -17,6 +18,9 @@ def convert(wave):  # wavenumber to and from wavelength
 
 𝛎f = convert(𝝺f*10**9)  # wavenumber of the fixed output at 1045 nm
 𝝺w = convert(3350+𝛎f) # wavelength of interest for CARS on water with 1045 nm fixed output
+
+def sech2(x):
+    return 1/(math.cosh(x)**2)
 
 print(f'{int(𝝺w)} nm')
 
