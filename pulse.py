@@ -91,7 +91,9 @@ class Pulse:
         )
         instantTime = np.extract(instantEnvelope[0:-1] > 0.001, self.time)
         instantPhase = np.extract(instantEnvelope[0:-1] > 0.001, instantPhase)
-        instantEnvelope = np.extract(instantEnvelope[0:-1] > 0.001, instantEnvelope)
+        instantEnvelope = np.extract(
+            instantEnvelope[0:-1] > 0.001, instantEnvelope
+        )
 
         return instantTime, instantEnvelope, instantPhase, instantRadFrequency
 
@@ -114,11 +116,14 @@ class Pulse:
             self.S += self.S
             self.N += self.N
             self.time = self.generateTimeSteps(self.N, self.S)
-            self.field = np.pad(self.field, (int(self.N/4),), 'constant', constant_values=(0,))
+            self.field = np.pad(
+                self.field, (int(self.N / 4),), "constant", constant_values=(0,)
+            )
             print("Warning: temporal field reaching edges")
 
-
-        𝜙 = np.array([2 * π / 𝜆 * indexFct(abs(𝜆)) * d for 𝜆 in self.wavelengths])
+        𝜙 = np.array(
+            [2 * π / 𝜆 * indexFct(abs(𝜆)) * d for 𝜆 in self.wavelengths]
+        )
 
         phaseFactor = np.exp(I * 𝜙)
         field = np.fft.fft(self.field)
@@ -132,7 +137,8 @@ class Pulse:
 
     def setupPlot(self, title=""):
         plt.style.use(
-            "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle")
+            "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle"
+        )
         plt.title(title)
         plt.xlabel("Time [ps]")
         plt.ylabel("Field amplitude [arb.u.]")
@@ -204,7 +210,9 @@ class Pulse:
             e1 = instantEnvelope[i]
             e2 = instantEnvelope[i + step]
             axis.add_patch(
-                Polygon([(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(c))
+                Polygon(
+                    [(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(c)
+                )
             )
 
     def silica(self, wavelength):
@@ -266,8 +274,6 @@ class Pulse:
 
 
 if __name__ == "__main__":
-
-
     # All adjustable parameters below
     pulse = Pulse(𝛕=5e-15, 𝜆ₒ=800e-9)
 
@@ -281,7 +287,7 @@ if __name__ == "__main__":
     showCarrier = False
 
     # Save graph? (set to None to not save)
-    filenameTemplate = "fig-{0:02d}.png" # Can use PDF but PNG for making movies with Quicktime Player
+    filenameTemplate = "fig-{0:02d}.png"  # Can use PDF but PNG for making movies with Quicktime Player
 
     # End adjustable parameters
 
@@ -301,14 +307,14 @@ if __name__ == "__main__":
         pulse.setupPlot("Propagation in {0}".format(material.__func__.__name__))
         pulse.drawEnvelope()
         pulse.drawChirpColour()
-    
+
         if showCarrier:
             pulse.drawField()
 
         if adjustTimeScale:
-            𝛕 = pulse.temporalWidth*1e12
-            plt.xlim(-5*𝛕, 5*𝛕)
-        
+            𝛕 = pulse.temporalWidth * 1e12
+            plt.xlim(-5 * 𝛕, 5 * 𝛕)
+
         plt.draw()
         plt.pause(0.001)
 
