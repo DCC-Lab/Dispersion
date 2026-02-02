@@ -269,11 +269,12 @@ if __name__ == "__main__":
 
 
     # All adjustable parameters below
-    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=800e-9)
+    pulse = Pulse(𝛕=76e-15, 𝜆ₒ=805e-9) # 𝛕 must be the gaissian parameter in electric field
+    # pulse = Pulse(𝛕=1.4142*151e-15, 𝜆ₒ=1045e-9) # 𝛕 must be the gaissian parameter in electric field
 
     # Material propertiues and distances, steps
-    material = pulse.bk7
-    totalDistance = 0.025
+    material = pulse.silica
+    totalDistance = 0.196
     steps = 40
 
     # What to display on graph in addition to envelope?
