@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Polygon
 import numpy as np
 from scipy.signal import hilbert, chirp
-from matplotlib import cm
+from matplotlib import colormaps
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 # You could import materials from Raytracing:
@@ -192,7 +192,7 @@ class Pulse:
             5 * 2 * π * self.spectralWidth
         ) + 0.33
 
-        hsv = cm.get_cmap("hsv", 64)
+        hsv = colormaps["hsv"]
         M = 128
 
         instantTimeInPs = instantTime * 1e12
@@ -246,19 +246,6 @@ class Pulse:
             + 0.256287842 / (1 - 0.0595736775 / x**2)
             + 1.64447552 / (1 - 147.468793 / x**2)
         ) ** 0.5
-    
-    def sf57(self, wavelength):
-        x = wavelength * 1e6
-        if x < 0.3:
-            x = 0.3
-        elif x > 2.5:
-            x = 2.5
-        return (
-            1
-            + 1.81651371 / (1 - 0.0143704198 / x**2)
-            + 0.428893641 / (1 - 0.0592801172 / x**2)
-            + 1.07186278 / (1 - 121.419942 / x**2)
-        ) ** 0.5
 
     def water(self, wavelength):
         x = wavelength * 1e6
@@ -282,11 +269,12 @@ if __name__ == "__main__":
 
 
     # All adjustable parameters below
-    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=805e-9)
+    pulse = Pulse(𝛕=76e-15, 𝜆ₒ=805e-9) # 𝛕 must be the gaissian parameter in electric field
+    # pulse = Pulse(𝛕=1.4142*151e-15, 𝜆ₒ=1045e-9) # 𝛕 must be the gaissian parameter in electric field
 
     # Material propertiues and distances, steps
-    material = pulse.sf57
-    totalDistance = 0.025
+    material = pulse.silica
+    totalDistance = 0.196
     steps = 40
 
     # What to display on graph in addition to envelope?
