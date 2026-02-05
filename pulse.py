@@ -29,7 +29,8 @@ class Pulse:
         self.fₒ = self.𝝎ₒ / 2 / π
 
         t = self.generateTimeSteps(N, S)
-        self.field = np.exp(-(t * t) / (𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
+        self.field = np.exp(-(t * t) / (2 * 𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
+        # self.field = (1/np.cosh(t/𝛕)) * np.cos(self.𝝎ₒ * t)
         self.time = t
         self.distancePropagated = 0
 
@@ -269,7 +270,7 @@ if __name__ == "__main__":
 
 
     # All adjustable parameters below
-    pulse = Pulse(𝛕=76e-15, 𝜆ₒ=805e-9) # 𝛕 must be the gaissian parameter in electric field
+    pulse = Pulse(𝛕=120e-15, 𝜆ₒ=1045e-9) # 𝛕 must be the gaussian parameter in electric field
     # pulse = Pulse(𝛕=1.4142*151e-15, 𝜆ₒ=1045e-9) # 𝛕 must be the gaissian parameter in electric field
 
     # Material propertiues and distances, steps
@@ -288,7 +289,7 @@ if __name__ == "__main__":
 
     print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
     stepDistance = totalDistance / steps
-    for j in range(steps):
+    for j in range(steps+1):
         print(
             "{0}\t{1:.1f}\t{2:0.3f}\t{3:0.3f}\t{4:0.3f}".format(
                 j,
@@ -313,8 +314,8 @@ if __name__ == "__main__":
         plt.draw()
         plt.pause(0.001)
 
-        if filenameTemplate is not None:
-            plt.savefig(filenameTemplate.format(j), dpi=300)
+        # if filenameTemplate is not None:
+            # plt.savefig(filenameTemplate.format(j), dpi=300)
         pulse.tearDownPlot()
 
         pulse.propagate(stepDistance, material)
