@@ -107,6 +107,11 @@ class Pulse:
         analyticSignal = np.roll(analyticSignal, deltaRoll)
         return analyticSignal
 
+    @property
+    def fwhm_duration(self):
+    # For a Gaussian pulse, FWHM = 2 * sqrt(2 * ln(2)) * RMS
+        return self.temporalWidth * 2.3548
+
     def propagate(self, d, indexFct=None):
         if indexFct is None:
             indexFct = self.bk7
