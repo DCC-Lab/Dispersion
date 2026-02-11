@@ -29,7 +29,7 @@ class Pulse:
         self.fₒ = self.𝝎ₒ / 2 / π
 
         t = self.generateTimeSteps(N, S)
-        self.field = np.exp(-(t * t) / (2 * 𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
+        self.field = np.exp(-(t * t) / (𝛕 * 𝛕)) * np.cos(self.𝝎ₒ * t)
         # self.field = (1/np.cosh(t/𝛕)) * np.cos(self.𝝎ₒ * t)
         self.time = t
         self.distancePropagated = 0
@@ -235,6 +235,20 @@ class Pulse:
         ) ** 0.5
         return n
 
+    def stih6(self, wavelength):
+        x = wavelength * 1e6
+        if x < 0.3:
+            x = 0.3
+        elif x > 2.5:
+            x = 2.5
+        n = (
+            1
+            + 1.77227611 / (1 - 0.0131182633 / x**2)
+            + 0.34569125 / (1 - 0.0614479619 / x**2)
+            + 2.40788501 / (1 - 200.753254 / x**2)
+        ) ** .5
+        return n
+
     def sf10(self, wavelength):
         x = wavelength * 1e6
         if x < 0.3:
@@ -270,13 +284,12 @@ if __name__ == "__main__":
 
 
     # All adjustable parameters below
-    pulse = Pulse(𝛕=120e-15, 𝜆ₒ=1045e-9) # 𝛕 must be the gaussian parameter in electric field
-    # pulse = Pulse(𝛕=1.4142*151e-15, 𝜆ₒ=1045e-9) # 𝛕 must be the gaissian parameter in electric field
+    pulse = Pulse(𝛕=102e-15, 𝜆ₒ=805e-9) # 𝛕 must be the gaussian parameter in electric field
 
     # Material propertiues and distances, steps
     material = pulse.silica
-    totalDistance = 0.196
-    steps = 40
+    totalDistance = 0.15
+    steps = 30
 
     # What to display on graph in addition to envelope?
     adjustTimeScale = False
@@ -314,8 +327,8 @@ if __name__ == "__main__":
         plt.draw()
         plt.pause(0.001)
 
-        # if filenameTemplate is not None:
-            # plt.savefig(filenameTemplate.format(j), dpi=300)
+        if filenameTemplate is not None:
+            plt.savefig(filenameTemplate.format(j), dpi=300)
         pulse.tearDownPlot()
 
         pulse.propagate(stepDistance, material)
