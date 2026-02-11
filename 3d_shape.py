@@ -94,12 +94,12 @@ class ShapePlotter:
 
 if __name__ == '__main__':
     # Example usage at 805 nm
-    sigma_t = 46.85e-3  # 1/2 Width at 1/e of the field gaussian along t-axis, temporal axis
+    sigma_t_805 = 46.85e-3  # 1/2 Width at 1/e of the field gaussian along t-axis, temporal axis
     sigma_lambda = 5.1674 # Width along λ-axis, spectral axis
     lambda0 = 803.1577
 
     # Gaussian plot in nm
-    plotter_nm = ShapePlotter(sigma_t, sigma_lambda, lambda0=lambda0, unit='nm')
+    plotter_nm = ShapePlotter(sigma_t_805, sigma_lambda, lambda0=lambda0, unit='nm')
     plotter_nm.plot_3d('gaussian')
     plotter_nm.plot_projections('gaussian')
 
@@ -109,12 +109,12 @@ if __name__ == '__main__':
 
 
     # Example usage at 1045 nm
-    sigma_t = 107.5e-3  # Width along t-axis, temporal axis
+    sigma_t_1045 = 107.5e-3  # Width along t-axis, temporal axis
     sigma_lambda = 3.7891 # Width along λ-axis, spectral axis
     lambda0 = 1040.8500
 
     # Gaussian plot in nm
-    plotter_nm = ShapePlotter(sigma_t, sigma_lambda, lambda0=lambda0, unit='nm')
+    plotter_nm = ShapePlotter(sigma_t_1045, sigma_lambda, lambda0=lambda0, unit='nm')
     plotter_nm.plot_3d('gaussian')
     plotter_nm.plot_projections('gaussian')
 
@@ -126,6 +126,13 @@ if __name__ == '__main__':
     # Example with wavenumbers around 805 nm
     lambda0_wn = 12451.7349
     sigma_lambda_wn = 81.4550
-    plotter_wn = ShapePlotter(sigma_t, sigma_lambda_wn, lambda0=lambda0_wn, unit='cm-1')
+    plotter_wn = ShapePlotter(sigma_t_805, sigma_lambda_wn, lambda0=lambda0_wn, unit='cm-1')
+    plotter_wn.plot_3d('gaussian')
+    plotter_wn.plot_projections('gaussian')
+
+    # Example with wavenumbers around 1045 nm
+    lambda0_wn = 9607.7701
+    sigma_lambda_wn = 36.1284
+    plotter_wn = ShapePlotter(sigma_t_1045, sigma_lambda_wn, lambda0=lambda0_wn, unit='cm-1')
     plotter_wn.plot_3d('gaussian')
     plotter_wn.plot_projections('gaussian')
