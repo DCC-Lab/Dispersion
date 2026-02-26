@@ -39,11 +39,11 @@ Pump (Δλ_I, λ₀, glass)          Stokes (Δλ_I, λ₀, glass)
   ┌──────────────────────────────────────────────────┐
   │  For each λᵢ in spectral grid:                   │
   │    group_delay(λᵢ) = d · n_g(λᵢ) / c            │
-  │    I(t, λᵢ) = A(λᵢ) · exp(-2(t-τg)²/τ_E²)  [1] │
+  │    E(t, λᵢ) = A_E(λᵢ) · exp(-(t-τg)²/τ_E²) [1] │
   └──────────────────────────────────────────────────┘
         │                                  │
-  3-D plot I(t,λ) — initial        3-D plot I(t,λ) — initial
-  3-D plot I(t,λ) — propagated     3-D plot I(t,λ) — propagated
+  3-D plot I=E²(t,λ) — initial     3-D plot I=E²(t,λ) — initial
+  3-D plot I=E²(t,λ) — propagated  3-D plot I=E²(t,λ) — propagated
         │                                  │
         └──────────────┬───────────────────┘
                        ▼
@@ -87,41 +87,44 @@ SCENARIOS = [
 This section documents a distinction that is critical for interpreting the
 simulation output correctly.
 
-### Pulse propagation — stored as **intensity**
+### Pulse propagation — stored as **field amplitude**, plotted as intensity
 
-`build_pulse()` stores `I_init` and `I_prop` as **optical intensity** arrays:
+`build_pulse()` propagates and stores **field amplitude** arrays `E_init`, `E_prop`:
 
 ```
-I(t, λᵢ) = A(λᵢ) · exp(−2(t − τg(λᵢ))² / τ_E²)      [1]
+E(t, λᵢ) = A_E(λᵢ) · exp(−(t − τg(λᵢ))² / τ_E²)      [1]
 ```
 
 | Symbol | Meaning |
 |--------|---------|
-| `A(λᵢ)` | Intensity spectral weight — Gaussian with FWHM = input `Δλ_I` |
-| `τ_E` | Field Gaussian parameter, derived from input via TBP = Δt_I·Δν_I = 2ln2/π |
-| `exp(−2t²/τ_E²)` | Temporal **intensity** Gaussian (factor −2 ↔ field squaring) |
+| `A_E(λᵢ)` | Field amplitude spectral weight — Gaussian with FWHM_field = `Δλ_I · √2` |
+| `τ_E` | Field Gaussian parameter, derived from the input intensity FWHM via TBP |
+| `exp(−t²/τ_E²)` | Temporal **field** Gaussian — squaring gives the intensity envelope |
 | `τg(λᵢ)` | Relative group delay of spectral component λᵢ (reference = λ₀) |
 
-The field amplitude at (λᵢ, t) is therefore `E(t,λᵢ) = √I(t,λᵢ)`.
+The intensity at (λᵢ, t) is recovered by squaring: `I(t,λᵢ) = E(t,λᵢ)²`.
 
-The 3D plots labeled **"Intensity I (norm.)"** show exactly this intensity
-representation. This is what a photodetector measures and the natural quantity
-for visualisation.
+The 3D pulse plots labeled **"Intensity I (norm.)"** display `E_prop²` — squaring
+is done inside `plot_pulse_3d`. This is what a photodetector measures.
 
-Note that τ_E is the **field** Gaussian parameter, not the intensity one:
+Key relationships between field and intensity Gaussians:
 
 ```
-field:     E(t) ∝ exp(−t²/τ_E²)         FWHM_field = τ_E · 2√(ln 2)   ≈ 1.18 τ_E
-intensity: I(t) ∝ exp(−2t²/τ_E²)        FWHM_I     = τ_E · √(2 ln 2)  ≈ 0.83 τ_E
+field:     E(t) ∝ exp(−t²/τ_E²)          FWHM_field = τ_E · 2√(ln 2)   ≈ 1.18 τ_E
+intensity: I(t) = E² ∝ exp(−2t²/τ_E²)   FWHM_I     = τ_E · √(2 ln 2)  ≈ 0.83 τ_E
 
-→ FWHM_I = FWHM_field / √2
+→  FWHM_I = FWHM_field / √2
 ```
 
 The input `Δλ_I` is the **intensity** spectral FWHM (as measured on a spectrometer).
-Its corresponding temporal FWHM is `Δt_I = 2ln2 / (π·Δν_I)` (transform-limited).
-Both are intensity-level quantities, consistent with the TBP ≈ 0.441.
+`spectral_nm_to_tau` converts it to the field τ_E via the TBP:
+`Δt_I · Δν_I = 2ln2/π ≈ 0.441`  (intensity FWHM × intensity FWHM, TL pulse).
 
-### CARS convolutions — operating at **field amplitude** level
+The spectral weight `A_E` has field FWHM = `Δλ_I · √2` so that `A_E² = A_I`
+recovers the measured intensity spectral envelope with FWHM = `Δλ_I`.
+The spectral grid is ±3.5 σ_E around λ₀ (field amplitude < 0.3 % of peak at edges).
+
+### CARS convolutions — also at **field amplitude** level
 
 The Raman coherence driven in a CARS process is:
 
@@ -129,35 +132,35 @@ The Raman coherence driven in a CARS process is:
 ρ(Ω, t) ∝ E_pump(t) × E_Stokes*(t)      (field × field)
 ```
 
-`compute_conv1` therefore operates on **field amplitudes** √I, not on intensities:
+`compute_conv1` uses `E_prop` directly — no square root needed — to form the
+physically correct product:
 
 ```
-C₁(Ω, t) = Σₖ √I_pump(νₖ, t) · √I_Stokes(νₖ − Ω, t)      [2]
+C₁(Ω, t) = Σₖ E_pump(νₖ, t) · E_Stokes(νₖ − Ω, t)      [2]
 ```
 
-Using I_pump × I_Stokes (intensity product) instead would square the coherence
-and artificially narrow its spectral width by √2, overestimating the resolution.
+Using intensity arrays (I × I) instead would square the coherence and artificially
+narrow its spectral width by √2, overestimating the resolution.
 
 Similarly, the probe step in `compute_conv2_2d` uses the pump field amplitude:
 
 ```
-C₂(ν_AS, t) = ∫ C₁(Ω, t) · √I_pump(ν_AS − Ω, t) dΩ       [3]
+C₂(ν_AS, t) = ∫ C₁(Ω, t) · E_pump(ν_AS − Ω, t) dΩ       [3]
 ```
 
 where `ν_AS = ν_pump_center + Ω` (~15 292 cm⁻¹ ≈ 654 nm).
 
 The 3D plots labeled **"Excitation ampl. (norm.)"** and **"AS ampl. (norm.)"**
-reflect these field-amplitude quantities. To convert to observable intensities
-(e.g. photon counts), one would square these values — but for spectral resolution
-analysis (RMS width of C₁, C₂) the amplitude form suffices and is standard.
+show these field-amplitude quantities. To convert to observable intensities
+(e.g. photon counts), square the values.
 
 ### Summary
 
-| Array / Plot | Quantity | Factor |
+| Array / Plot | Quantity | Gaussian exponent |
 |---|---|---|
-| `I_init`, `I_prop` | Optical intensity I(t,λ) | ∝ \|E\|² |
-| Pulse 3D plots z-axis | Intensity (norm.) | ∝ \|E\|² |
-| `C₁(Ω, t)` | Raman excitation amplitude | ∝ E_pump·E_Stokes |
-| C₁ 3D plots z-axis | Excitation ampl. (norm.) | ∝ E_pump·E_Stokes |
-| `C₂(ν_AS, t)` | Anti-Stokes field amplitude | ∝ E_pump·C₁ |
-| C₂ 3D plots z-axis | AS ampl. (norm.) | ∝ E_pump·C₁ |
+| `E_init`, `E_prop` | Field amplitude E(t,λ) | exp(−t²/τ_E²) |
+| Pulse 3D plots z-axis | Intensity I = E² (norm.) | exp(−2t²/τ_E²) |
+| `C₁(Ω, t)` | Raman coherence amplitude ∝ E_pump·E_Stokes | — |
+| C₁ 3D plots z-axis | Excitation ampl. (norm.) | — |
+| `C₂(ν_AS, t)` | Anti-Stokes field amplitude ∝ E_pump·C₁ | — |
+| C₂ 3D plots z-axis | AS ampl. (norm.) | — |

@@ -144,24 +144,31 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
     Returns a dict with:
       lambdas_nm   [n_spec]         — spectral grid (nm)
       wn_cm1       [n_spec]         — wavenumber grid (cm⁻¹)
-      A            [n_spec]         — spectral Gaussian weights
-      tau_s                         — field Gaussian parameter (s)
+      A            [n_spec]         — field amplitude spectral weights  (A² = intensity weights)
+      tau_s                         — field Gaussian parameter τ_E (s)
       t_ps_init    [n_time]         — time axis for initial pulse (ps)
-      I_init       [n_spec, n_time] — 2-D intensity before propagation
+      E_init       [n_spec, n_time] — 2-D field amplitude before propagation
       t_ps_prop    [n_time]         — time axis after propagation (ps)
-      I_prop       [n_spec, n_time] — 2-D intensity after propagation
+      E_prop       [n_spec, n_time] — 2-D field amplitude after propagation
       gd_ps        [n_spec]         — relative group delays (ps)
-    """
-    tau_s    = spectral_nm_to_tau(fwhm_spectral_nm, lambda0_nm)
-    sigma_nm = fwhm_spectral_nm / (2.0 * np.sqrt(2.0 * np.log(2.0)))  # FWHM → 1-σ
 
-    # Spectral grid: ±3.5σ around central wavelength
+    For display: intensity = E_init**2 or E_prop**2 (done inside plot_pulse_3d).
+    For convolutions: use E_prop directly — field amplitudes required.
+    """
+    tau_s = spectral_nm_to_tau(fwhm_spectral_nm, lambda0_nm)
+
+    # Field amplitude σ: A_field = exp(-0.5*(λ-λ0)²/σ_E²), FWHM_field = FWHM_I × √2.
+    # A_field² gives intensity weights with FWHM = fwhm_spectral_nm (input intensity FWHM).
+    # Derivation: A² has FWHM_I = 2·σ_E·√ln2  →  σ_E = FWHM_I / (2·√ln2).
+    sigma_nm = fwhm_spectral_nm / (2.0 * np.sqrt(np.log(2.0)))   # field amplitude σ [nm]
+
+    # Spectral grid: ±3.5σ_E around central wavelength (covers field to < 0.3 % of peak)
     lam_min = lambda0_nm - 3.5 * sigma_nm
     lam_max = lambda0_nm + 3.5 * sigma_nm
     lambdas_nm = np.linspace(lam_min, lam_max, n_spec)
     wn_cm1 = 1e7 / lambdas_nm                               # cm⁻¹
 
-    # Spectral weights (Gaussian in wavelength)
+    # Field amplitude spectral weights — FWHM = fwhm_spectral_nm × √2 (field FWHM)
     A = np.exp(-0.5 * ((lambdas_nm - lambda0_nm) / sigma_nm)**2)
     A /= A.max()
 
@@ -174,24 +181,24 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
     gd_s = gd_s_abs - gd_ref                                      # [s], relative to centre
     gd_ps = gd_s * 1e12
 
-    # --- Initial (unchirped) time grid ---  centred at t = 0
+    # --- Initial (unchirped) field amplitude time grid ---  centred at t = 0
     t_span_init = 8.0 * tau_s
     t_s_init = np.linspace(-t_span_init / 2, t_span_init / 2, n_time)
     t_ps_init = t_s_init * 1e12
 
-    I_init = np.zeros((n_spec, n_time))
+    E_init = np.zeros((n_spec, n_time))
     for i in range(n_spec):
-        I_init[i, :] = A[i] * np.exp(-2.0 * t_s_init**2 / tau_s**2)
+        E_init[i, :] = A[i] * np.exp(-t_s_init**2 / tau_s**2)    # field: exp(-t²/τ_E²)
 
-    # --- Propagated time grid: centred at t = 0,  wide enough for all gd-shifted slices ---
+    # --- Propagated field amplitude: each slice shifted by its group delay ---
     gd_spread = gd_s.max() - gd_s.min()
     t_half = max(gd_spread * 2.5, 5.0 * tau_s)
     t_s_prop = np.linspace(-t_half, t_half, n_time)
     t_ps_prop = t_s_prop * 1e12
 
-    I_prop = np.zeros((n_spec, n_time))
+    E_prop = np.zeros((n_spec, n_time))
     for i in range(n_spec):
-        I_prop[i, :] = A[i] * np.exp(-2.0 * (t_s_prop - gd_s[i])**2 / tau_s**2)
+        E_prop[i, :] = A[i] * np.exp(-(t_s_prop - gd_s[i])**2 / tau_s**2)  # field
 
     return dict(
         lambdas_nm=lambdas_nm,
@@ -199,9 +206,9 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
         A=A,
         tau_s=tau_s,
         t_ps_init=t_ps_init,
-        I_init=I_init,
+        E_init=E_init,
         t_ps_prop=t_ps_prop,
-        I_prop=I_prop,
+        E_prop=E_prop,
         gd_ps=gd_ps,
         lambda0_nm=lambda0_nm,
         fwhm_spectral_nm=fwhm_spectral_nm,
@@ -264,9 +271,9 @@ def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
     n_common = max(len(t_pump), len(t_stokes))
     t_common = np.linspace(t_min, t_max, n_common)
 
-    # Use field amplitudes (sqrt of intensity) for physically correct CARS driving term
-    P = np.sqrt(_interp_rows(pump['I_prop'],   t_pump,   t_common))   # [n_pump, n_t]
-    S = np.sqrt(_interp_rows(stokes['I_prop'], t_stokes, t_common))   # [n_stokes, n_t]
+    # E_prop already stores field amplitudes — use directly (no sqrt needed)
+    P = _interp_rows(pump['E_prop'],   t_pump,   t_common)   # [n_pump, n_t]   field amplitude
+    S = _interp_rows(stokes['E_prop'], t_stokes, t_common)   # [n_stokes, n_t] field amplitude
 
     # ── build a fine wavenumber grid covering pump_wn − Ω for all Ω ──
     # Standard CARS: Stokes at ν_pump − Ω  (Stokes is lower ν)
@@ -347,8 +354,8 @@ def compute_conv2_2d(C1_2d, pump, t_common, raman_axis):
     nu_pump_center = 1e7 / pump['lambda0_nm']
     as_axis = nu_pump_center + raman_axis
 
-    # Use pump field amplitude (sqrt of intensity) — consistent with C₁ field-level treatment
-    P = np.sqrt(_interp_rows(pump['I_prop'], pump['t_ps_prop'], t_common))
+    # E_prop already stores field amplitudes — use directly (no sqrt needed)
+    P = _interp_rows(pump['E_prop'], pump['t_ps_prop'], t_common)
 
     pump_wn = pump['wn_cm1']
     dOmega  = raman_axis[1] - raman_axis[0]
@@ -403,8 +410,9 @@ def _save_plotly(pfig, step_name, output_dir):
     print(f"  saved → {path}")
 
 
-def plot_pulse_3d(t_ps, lambdas_nm, I_2d, title, step_name, output_dir):
-    """3-D surface: time × wavelength × intensity."""
+def plot_pulse_3d(t_ps, lambdas_nm, E_2d, title, step_name, output_dir):
+    """3-D surface: time × wavelength × intensity  (E_2d is field amplitude; squared here)."""
+    I_2d   = E_2d**2
     I_norm = I_2d / (I_2d.max() or 1.0)
     T, L = np.meshgrid(t_ps, lambdas_nm)
 
@@ -601,23 +609,23 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
 
     # ── [3] Plot initial pulses ───────────────────────────────
     print("\n[3/9] 3-D plots: initial (unchirped) pulses …")
-    plot_pulse_3d(pump['t_ps_init'],   pump['lambdas_nm'],   pump['I_init'],
+    plot_pulse_3d(pump['t_ps_init'],   pump['lambdas_nm'],   pump['E_init'],
                   f'Pump — initial  (λ₀={PUMP_LAMBDA0_NM} nm, Δλ={PUMP_FWHM_NM} nm, '
                   f'τ_TL={p_fwhm_fs:.0f} fs, TBP={p_tbp:.3f})',
                   'pump_step0_initial', output_dir=output_dir)
 
-    plot_pulse_3d(stokes['t_ps_init'], stokes['lambdas_nm'], stokes['I_init'],
+    plot_pulse_3d(stokes['t_ps_init'], stokes['lambdas_nm'], stokes['E_init'],
                   f'Stokes — initial  (λ₀={STOKES_LAMBDA0_NM} nm, Δλ={STOKES_FWHM_NM} nm, '
                   f'τ_TL={s_fwhm_fs:.0f} fs, TBP={s_tbp:.3f})',
                   'stokes_step0_initial', output_dir=output_dir)
 
     # ── [4] Plot propagated pulses ────────────────────────────
     print("\n[4/9] 3-D plots: after glass propagation …")
-    plot_pulse_3d(pump['t_ps_prop'],   pump['lambdas_nm'],   pump['I_prop'],
+    plot_pulse_3d(pump['t_ps_prop'],   pump['lambdas_nm'],   pump['E_prop'],
                   f'Pump — after {pump_glass_mm} mm {GLASS_MATERIAL.upper()}',
                   'pump_step1_propagated', output_dir=output_dir)
 
-    plot_pulse_3d(stokes['t_ps_prop'], stokes['lambdas_nm'], stokes['I_prop'],
+    plot_pulse_3d(stokes['t_ps_prop'], stokes['lambdas_nm'], stokes['E_prop'],
                   f'Stokes — after {stokes_glass_mm} mm {GLASS_MATERIAL.upper()}',
                   'stokes_step1_propagated', output_dir=output_dir)
 

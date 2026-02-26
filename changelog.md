@@ -81,3 +81,21 @@
 ### Results after fix (Scenario A, both 15 cm)
 - C₁ RMS (optimal delay): 26.9 cm⁻¹ (was 19.3 cm⁻¹ with intensity product — ratio √2 ✓)
 - C₂ RMS: 42.5 cm⁻¹ (was 30.2 cm⁻¹ — ratio √2 ✓)
+
+## 2026-02-26 — Propagation also on field amplitude (E_prop replaces I_prop)
+
+### Changed
+- `build_pulse`: spectral weight A is now the **field amplitude** envelope:
+  - `sigma_E = FWHM_I / (2√ln2)` (was `FWHM_I / (2√(2ln2))` for intensity σ)
+  - `A_E = exp(-0.5*(λ-λ0)²/σ_E²)` → FWHM_field = FWHM_I·√2; A_E² gives FWHM_I ✓
+  - Temporal Gaussian changed from `exp(-2t²/τ_E²)` (intensity) to `exp(-t²/τ_E²)` (field)
+  - Dict keys renamed: `I_init` → `E_init`, `I_prop` → `E_prop`
+- Spectral grid now ±3.5 σ_E (wider by √2; field amplitude < 0.3 % at edges)
+  → GD spread reported wider by √2 (more spectral components included)
+- `plot_pulse_3d`: squares E_2d before display (`I = E²`); z-axis label unchanged
+- `compute_conv1`: `E_prop` used directly (no `np.sqrt` needed any more)
+- `compute_conv2_2d`: same — pump kernel from `E_prop` directly
+- README "Physical conventions" section updated throughout
+
+### Results (unchanged physics, as expected)
+- C₁ RMS: 27.1 cm⁻¹, C₂ RMS: 42.7 cm⁻¹ (within numerical precision of previous run)
