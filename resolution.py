@@ -1,9 +1,12 @@
 """
 resolution.py — Spectral-focusing CARS resolution simulation
 
-Step-by-step chirping of pump (1045 nm) and Stokes (805 nm) pulses through
+Step-by-step chirping of pump (803 nm) and Stokes (1041 nm) pulses through
 S-TIH6 glass, followed by the pump⊗Stokes cross-correlation (Raman excitation)
 and degenerate probe broadening, with spectral resolution readout.
+
+Inputs: spectral FWHM of the intensity Gaussian [nm] + central wavelength [nm].
+Runs two glass-length scenarios automatically and saves each to its own folder.
 
 All 3-D plots are saved as PDF (matplotlib) + interactive HTML (plotly).
 """
@@ -27,15 +30,15 @@ except ImportError:
 # ─────────────────────────────────────────────
 #  CONFIGURATION  (edit these to change inputs)
 # ─────────────────────────────────────────────
-PUMP_FWHM_FS      = 107.5      # Pump intensity FWHM [fs]
-PUMP_LAMBDA0_NM   = 1040.85    # Pump central wavelength [nm]
-PUMP_GLASS_MM     = 150.0      # Pump glass propagation length [mm]
+# Pump: shorter wavelength = higher frequency (standard CARS convention)
+PUMP_FWHM_NM    = 11.77     # Pump spectral intensity FWHM [nm]
+PUMP_LAMBDA0_NM = 803.31    # Pump central wavelength [nm]
 
-STOKES_FWHM_FS    = 46.85      # Stokes intensity FWHM [fs]
-STOKES_LAMBDA0_NM = 803.1577   # Stokes central wavelength [nm]
-STOKES_GLASS_MM   = 100.0      # Stokes glass propagation length [mm]
+# Stokes: longer wavelength = lower frequency
+STOKES_FWHM_NM    = 8.92      # Stokes spectral intensity FWHM [nm]
+STOKES_LAMBDA0_NM = 1041.22   # Stokes central wavelength [nm]
 
-GLASS_MATERIAL    = 'stih6'    # Currently only stih6 supported
+GLASS_MATERIAL = 'stih6'    # Currently only stih6 supported
 
 N_SPEC   = 80     # Spectral grid points per beam
 N_TIME   = 1000   # Time grid points
@@ -47,7 +50,11 @@ N_RAMAN       = 300    # Points on Raman axis
 DELAY_SCAN_PS_RANGE = 8.0   # ± range for optimal-delay scan [ps]
 DELAY_SCAN_N        = 150   # Number of delay points to scan
 
-OUTPUT_DIR = 'plots/resolution'
+# Scenarios — (pump_glass_mm, stokes_glass_mm, output_dir)
+SCENARIOS = [
+    (150, 150, 'plots/resolution',         'Scenario A — pump 15 cm · Stokes 15 cm'),
+    ( 50, 150, 'plots/resolution_pump5cm', 'Scenario B — pump  5 cm · Stokes 15 cm'),
+]
 
 # ─────────────────────────────────────────────
 #  PHYSICAL CONSTANTS
@@ -94,28 +101,37 @@ def group_delay(wl_m, glass_m, material='stih6'):
 #  PULSE HELPERS
 # ─────────────────────────────────────────────
 
-def fwhm_to_tau(fwhm_fs):
-    """Intensity FWHM [fs] → field Gaussian parameter τ [s].
-    I(t) ∝ exp(−2t²/τ²),  FWHM_I = τ·√(2·ln 2).
+def spectral_nm_to_tau(fwhm_spectral_nm, lambda0_nm):
+    """Spectral intensity FWHM [nm] → field Gaussian parameter τ [s].
+    Assumes transform-limited pulse: Δt_FWHM · Δν_FWHM = 2·ln2/π.
     """
-    return (fwhm_fs * 1e-15) / np.sqrt(2.0 * np.log(2.0))
-
-
-def spectral_fwhm_nm(fwhm_fs, lambda0_nm):
-    """Transform-limited spectral FWHM [nm] from temporal FWHM [fs]."""
-    fwhm_s = fwhm_fs * 1e-15
-    # Δt_FWHM · Δν_FWHM = 2·ln2/π  (transform limit for Gaussian)
-    delta_nu = 2.0 * np.log(2.0) / (np.pi * fwhm_s)
     lambda0_m = lambda0_nm * 1e-9
-    delta_lambda_m = (lambda0_m**2 / c) * delta_nu
-    return delta_lambda_m * 1e9   # nm
+    fwhm_m    = fwhm_spectral_nm * 1e-9
+    delta_nu  = c * fwhm_m / lambda0_m**2           # Hz
+    fwhm_t_s  = 2.0 * np.log(2.0) / (np.pi * delta_nu)
+    return fwhm_t_s / np.sqrt(2.0 * np.log(2.0))   # field τ [s]
 
 
-def build_pulse(fwhm_fs, lambda0_nm, glass_mm,
+def temporal_fwhm_fs(fwhm_spectral_nm, lambda0_nm):
+    """Convenience: transform-limited intensity FWHM [fs] from spectral FWHM [nm]."""
+    tau = spectral_nm_to_tau(fwhm_spectral_nm, lambda0_nm)
+    return tau * np.sqrt(2.0 * np.log(2.0)) * 1e15
+
+
+def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
                 material='stih6',
                 n_spec=N_SPEC, n_time=N_TIME):
     """
     Build and propagate a pulse component-by-component through glass.
+
+    Parameters
+    ----------
+    fwhm_spectral_nm : float
+        Spectral intensity FWHM [nm]  (transform-limited pulse assumed).
+    lambda0_nm : float
+        Central wavelength [nm].
+    glass_mm : float
+        Glass propagation length [mm].
 
     Returns a dict with:
       lambdas_nm   [n_spec]         — spectral grid (nm)
@@ -126,11 +142,10 @@ def build_pulse(fwhm_fs, lambda0_nm, glass_mm,
       I_init       [n_spec, n_time] — 2-D intensity before propagation
       t_ps_prop    [n_time]         — time axis after propagation (ps)
       I_prop       [n_spec, n_time] — 2-D intensity after propagation
-      gd_ps        [n_spec]         — group delays (ps)
+      gd_ps        [n_spec]         — relative group delays (ps)
     """
-    tau_s   = fwhm_to_tau(fwhm_fs)
-    sw_nm   = spectral_fwhm_nm(fwhm_fs, lambda0_nm)
-    sigma_nm = sw_nm / (2.0 * np.sqrt(2.0 * np.log(2.0)))   # FWHM → 1-σ
+    tau_s    = spectral_nm_to_tau(fwhm_spectral_nm, lambda0_nm)
+    sigma_nm = fwhm_spectral_nm / (2.0 * np.sqrt(2.0 * np.log(2.0)))  # FWHM → 1-σ
 
     # Spectral grid: ±3.5σ around central wavelength
     lam_min = lambda0_nm - 3.5 * sigma_nm
@@ -181,7 +196,7 @@ def build_pulse(fwhm_fs, lambda0_nm, glass_mm,
         I_prop=I_prop,
         gd_ps=gd_ps,
         lambda0_nm=lambda0_nm,
-        fwhm_fs=fwhm_fs,
+        fwhm_spectral_nm=fwhm_spectral_nm,
         glass_mm=glass_mm,
         material=material,
     )
@@ -222,8 +237,10 @@ def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
     t_common : 1-D time axis [ps]
     C1       : [n_raman, n_time]
     """
-    pump_wn   = pump['wn_cm1']    # [n_pump]   ascending (short λ → high ν)
-    stokes_wn = stokes['wn_cm1'] # [n_stokes]
+    # Pump: shorter λ → higher ν.  Stokes: longer λ → lower ν.
+    # CARS condition: ν_Stokes = ν_pump − Ω  (standard convention)
+    pump_wn   = pump['wn_cm1']    # [n_pump]   — higher ν side
+    stokes_wn = stokes['wn_cm1']  # [n_stokes] — lower  ν side
 
     t_pump   = pump['t_ps_prop']
     t_stokes = stokes['t_ps_prop'] + delay_ps
@@ -237,9 +254,10 @@ def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
     P = _interp_rows(pump['I_prop'],   t_pump,   t_common)   # [n_pump, n_t]
     S = _interp_rows(stokes['I_prop'], t_stokes, t_common)   # [n_stokes, n_t]
 
-    # ── build a fine wavenumber grid covering pump + all Raman shifts ──
-    wn_min = pump_wn.min() + raman_axis.min()
-    wn_max = pump_wn.max() + raman_axis.max()
+    # ── build a fine wavenumber grid covering pump_wn − Ω for all Ω ──
+    # Standard CARS: Stokes at ν_pump − Ω  (Stokes is lower ν)
+    wn_min = pump_wn.min() - raman_axis.max()
+    wn_max = pump_wn.max() - raman_axis.min()
     d_wn   = (stokes_wn.max() - stokes_wn.min()) / (len(stokes_wn) - 1)
     n_fine = max(int((wn_max - wn_min) / d_wn) + 2, len(stokes_wn))
     wn_fine = np.linspace(wn_min - d_wn, wn_max + d_wn, n_fine)
@@ -248,9 +266,9 @@ def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
     f_stokes = interp1d(stokes_wn, S, axis=0, bounds_error=False, fill_value=0.0)
     S_fine = f_stokes(wn_fine)                               # [n_fine, n_t]
 
-    # For each pump wavenumber ν_k and Raman shift Ω we need S at ν_k + Ω.
-    # shifted_wn[j, k] = pump_wn[k] + raman_axis[j]  →  shape [n_raman, n_pump]
-    shifted_wn = pump_wn[np.newaxis, :] + raman_axis[:, np.newaxis]
+    # For each pump wavenumber ν_k and Raman shift Ω we need S at ν_k − Ω.
+    # shifted_wn[j, k] = pump_wn[k] − raman_axis[j]  →  shape [n_raman, n_pump]
+    shifted_wn = pump_wn[np.newaxis, :] - raman_axis[:, np.newaxis]
 
     # Map shifted_wn to indices in wn_fine (linear index since wn_fine is uniform)
     idx = (shifted_wn - wn_fine[0]) / (wn_fine[1] - wn_fine[0])
@@ -332,14 +350,14 @@ def spectral_stats(raman_axis, spectrum):
 #  PLOTTING HELPERS
 # ─────────────────────────────────────────────
 
-def _save(fig, step_name, output_dir=OUTPUT_DIR):
+def _save(fig, step_name, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, f'{step_name}.pdf')
     fig.savefig(path, bbox_inches='tight')
     print(f"  saved → {path}")
 
 
-def _save_plotly(pfig, step_name, output_dir=OUTPUT_DIR):
+def _save_plotly(pfig, step_name, output_dir):
     if not _PLOTLY:
         return
     os.makedirs(output_dir, exist_ok=True)
@@ -348,7 +366,7 @@ def _save_plotly(pfig, step_name, output_dir=OUTPUT_DIR):
     print(f"  saved → {path}")
 
 
-def plot_pulse_3d(t_ps, lambdas_nm, I_2d, title, step_name):
+def plot_pulse_3d(t_ps, lambdas_nm, I_2d, title, step_name, output_dir):
     """3-D surface: time × wavelength × intensity."""
     I_norm = I_2d / (I_2d.max() or 1.0)
     T, L = np.meshgrid(t_ps, lambdas_nm)
@@ -364,7 +382,7 @@ def plot_pulse_3d(t_ps, lambdas_nm, I_2d, title, step_name):
     plt.tight_layout()
     plt.show(block=False)
     plt.pause(0.3)
-    _save(fig, step_name)
+    _save(fig, step_name, output_dir)
 
     if _PLOTLY:
         pfig = go.Figure(data=[go.Surface(x=T, y=L, z=I_norm,
@@ -375,12 +393,12 @@ def plot_pulse_3d(t_ps, lambdas_nm, I_2d, title, step_name):
                        yaxis_title='Wavelength (nm)',
                        zaxis_title='Intensity (norm.)'),
             width=900, height=650)
-        _save_plotly(pfig, step_name)
+        _save_plotly(pfig, step_name, output_dir)
 
     return fig
 
 
-def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name):
+def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name, output_dir):
     """3-D surface: time × Raman shift × excitation."""
     C1_norm = C1_2d / (C1_2d.max() or 1.0)
     T, R = np.meshgrid(t_ps, raman_axis)
@@ -396,7 +414,7 @@ def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name):
     plt.tight_layout()
     plt.show(block=False)
     plt.pause(0.3)
-    _save(fig, step_name)
+    _save(fig, step_name, output_dir)
 
     if _PLOTLY:
         pfig = go.Figure(data=[go.Surface(x=T, y=R, z=C1_norm,
@@ -407,12 +425,12 @@ def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name):
                        yaxis_title='Raman shift (cm⁻¹)',
                        zaxis_title='Excitation (norm.)'),
             width=900, height=650)
-        _save_plotly(pfig, step_name)
+        _save_plotly(pfig, step_name, output_dir)
 
     return fig
 
 
-def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name):
+def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name, output_dir):
     """1-D spectral projection with RMS annotation."""
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(raman_axis, C2 / C2.max(), lw=2, color='steelblue')
@@ -428,14 +446,14 @@ def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name):
     plt.tight_layout()
     plt.show(block=False)
     plt.pause(0.3)
-    _save(fig, step_name)
+    _save(fig, step_name, output_dir)
     return fig
 
 
 def plot_comparison(raman_axis,
                     C2_zero, nu_zero, sig_zero,
                     C2_opt,  nu_opt,  sig_opt,
-                    output_dir=OUTPUT_DIR):
+                    output_dir):
     """Side-by-side spectral projections centred at their respective centroids."""
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
     datasets = [
@@ -460,60 +478,65 @@ def plot_comparison(raman_axis,
 
 
 # ─────────────────────────────────────────────
-#  MAIN PIPELINE
+#  SCENARIO PIPELINE
 # ─────────────────────────────────────────────
 
-def main():
-    print("=" * 60)
-    print("  Spectral-focusing CARS — resolution simulation")
-    print("=" * 60)
+def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
+    """
+    Run the full 8-step chirping + CARS convolution pipeline for one
+    combination of glass lengths.  All plots are saved under output_dir.
+    """
+    sep = "=" * 60
+    print(f"\n{sep}")
+    print(f"  {scenario_label}")
+    print(f"  Pump {PUMP_LAMBDA0_NM} nm · {PUMP_FWHM_NM} nm FWHM · {pump_glass_mm} mm {GLASS_MATERIAL}")
+    print(f"  Stokes {STOKES_LAMBDA0_NM} nm · {STOKES_FWHM_NM} nm FWHM · {stokes_glass_mm} mm {GLASS_MATERIAL}")
+    print(sep)
 
     raman_axis = np.linspace(RAMAN_MIN_CM1, RAMAN_MAX_CM1, N_RAMAN)
 
     # ── [1] Build pump ────────────────────────────────────────
-    print(f"\n[1/8] Pump  λ₀={PUMP_LAMBDA0_NM} nm  "
-          f"FWHM={PUMP_FWHM_FS} fs  glass={PUMP_GLASS_MM} mm {GLASS_MATERIAL}")
-    pump = build_pulse(PUMP_FWHM_FS, PUMP_LAMBDA0_NM, PUMP_GLASS_MM,
+    print(f"\n[1/8] Building pump …")
+    pump = build_pulse(PUMP_FWHM_NM, PUMP_LAMBDA0_NM, pump_glass_mm,
                        GLASS_MATERIAL, N_SPEC, N_TIME)
-    print(f"  Spectral FWHM ≈ {spectral_fwhm_nm(PUMP_FWHM_FS, PUMP_LAMBDA0_NM):.3f} nm  "
+    print(f"  τ_TL ≈ {temporal_fwhm_fs(PUMP_FWHM_NM, PUMP_LAMBDA0_NM):.1f} fs  "
           f"GD spread ≈ {pump['gd_ps'].max()-pump['gd_ps'].min():.3f} ps")
 
     # ── [2] Build Stokes ──────────────────────────────────────
-    print(f"\n[2/8] Stokes  λ₀={STOKES_LAMBDA0_NM} nm  "
-          f"FWHM={STOKES_FWHM_FS} fs  glass={STOKES_GLASS_MM} mm {GLASS_MATERIAL}")
-    stokes = build_pulse(STOKES_FWHM_FS, STOKES_LAMBDA0_NM, STOKES_GLASS_MM,
+    print(f"\n[2/8] Building Stokes …")
+    stokes = build_pulse(STOKES_FWHM_NM, STOKES_LAMBDA0_NM, stokes_glass_mm,
                          GLASS_MATERIAL, N_SPEC, N_TIME)
-    print(f"  Spectral FWHM ≈ {spectral_fwhm_nm(STOKES_FWHM_FS, STOKES_LAMBDA0_NM):.3f} nm  "
+    print(f"  τ_TL ≈ {temporal_fwhm_fs(STOKES_FWHM_NM, STOKES_LAMBDA0_NM):.1f} fs  "
           f"GD spread ≈ {stokes['gd_ps'].max()-stokes['gd_ps'].min():.3f} ps")
 
     # ── [3] Plot initial pulses ───────────────────────────────
     print("\n[3/8] 3-D plots: initial (unchirped) pulses …")
     plot_pulse_3d(pump['t_ps_init'],   pump['lambdas_nm'],   pump['I_init'],
                   f'Pump — initial  (λ₀={PUMP_LAMBDA0_NM} nm, '
-                  f'FWHM={PUMP_FWHM_FS} fs)',
-                  'pump_step0_initial')
+                  f'Δλ={PUMP_FWHM_NM} nm FWHM)',
+                  'pump_step0_initial', output_dir=output_dir)
 
     plot_pulse_3d(stokes['t_ps_init'], stokes['lambdas_nm'], stokes['I_init'],
                   f'Stokes — initial  (λ₀={STOKES_LAMBDA0_NM} nm, '
-                  f'FWHM={STOKES_FWHM_FS} fs)',
-                  'stokes_step0_initial')
+                  f'Δλ={STOKES_FWHM_NM} nm FWHM)',
+                  'stokes_step0_initial', output_dir=output_dir)
 
     # ── [4] Plot propagated pulses ────────────────────────────
     print("\n[4/8] 3-D plots: after glass propagation …")
     plot_pulse_3d(pump['t_ps_prop'],   pump['lambdas_nm'],   pump['I_prop'],
-                  f'Pump — after {PUMP_GLASS_MM} mm {GLASS_MATERIAL.upper()}',
-                  'pump_step1_propagated')
+                  f'Pump — after {pump_glass_mm} mm {GLASS_MATERIAL.upper()}',
+                  'pump_step1_propagated', output_dir=output_dir)
 
     plot_pulse_3d(stokes['t_ps_prop'], stokes['lambdas_nm'], stokes['I_prop'],
-                  f'Stokes — after {STOKES_GLASS_MM} mm {GLASS_MATERIAL.upper()}',
-                  'stokes_step1_propagated')
+                  f'Stokes — after {stokes_glass_mm} mm {GLASS_MATERIAL.upper()}',
+                  'stokes_step1_propagated', output_dir=output_dir)
 
     # ── [5] Conv 1 — zero delay ───────────────────────────────
     print("\n[5/8] Raman excitation spectrum — zero delay …")
     t_zero, C1_zero = compute_conv1(pump, stokes, raman_axis, delay_ps=0.0)
     plot_conv1_3d(t_zero, raman_axis, C1_zero,
                   'Raman excitation  C₁(Ω, t) — zero delay',
-                  'conv1_zero_delay')
+                  'conv1_zero_delay', output_dir=output_dir)
 
     # ── [6] Conv 1 — optimal delay ────────────────────────────
     print("\n[6/8] Scanning for optimal Stokes delay …")
@@ -521,7 +544,7 @@ def main():
     t_opt, C1_opt = compute_conv1(pump, stokes, raman_axis, delay_ps=opt_delay_ps)
     plot_conv1_3d(t_opt, raman_axis, C1_opt,
                   f'Raman excitation  C₁(Ω, t) — optimal δt = {opt_delay_ps:+.3f} ps',
-                  'conv1_optimal_delay')
+                  'conv1_optimal_delay', output_dir=output_dir)
 
     # ── [7] Conv 2 — degenerate probe broadening ──────────────
     print("\n[7/8] Probe broadening (Conv 2) …")
@@ -541,20 +564,30 @@ def main():
     plot_projection(raman_axis, C2_zero, nu_zero, sig_zero,
                     f'CARS spectrum — zero delay\n'
                     f'center = {nu_zero:.1f} cm⁻¹,  RMS = {sig_zero:.1f} cm⁻¹',
-                    'conv2_zero_delay_projection')
+                    'conv2_zero_delay_projection', output_dir=output_dir)
 
     plot_projection(raman_axis, C2_opt, nu_opt, sig_opt,
                     f'CARS spectrum — optimal delay (δt = {opt_delay_ps:+.3f} ps)\n'
                     f'center = {nu_opt:.1f} cm⁻¹,  RMS = {sig_opt:.1f} cm⁻¹',
-                    'conv2_optimal_delay_projection')
+                    'conv2_optimal_delay_projection', output_dir=output_dir)
 
     # ── [8] Comparison ────────────────────────────────────────
     print("\n[8/8] Comparison figure …")
     plot_comparison(raman_axis,
                     C2_zero, nu_zero, sig_zero,
-                    C2_opt,  nu_opt,  sig_opt)
+                    C2_opt,  nu_opt,  sig_opt,
+                    output_dir=output_dir)
 
-    print(f"\nAll outputs saved in: {os.path.abspath(OUTPUT_DIR)}")
+    print(f"\nOutputs saved in: {os.path.abspath(output_dir)}")
+
+
+# ─────────────────────────────────────────────
+#  MAIN
+# ─────────────────────────────────────────────
+
+def main():
+    for pump_mm, stokes_mm, out_dir, label in SCENARIOS:
+        run_scenario(pump_mm, stokes_mm, out_dir, label)
     plt.show()   # keep all windows open until closed by user
 
 
