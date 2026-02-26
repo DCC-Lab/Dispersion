@@ -38,3 +38,26 @@
 - Scenario A optimal C₁ RMS: 19.3 cm⁻¹ → after probe: 79.7 cm⁻¹
 - Scenario B optimal C₁ RMS: 41.6 cm⁻¹ → after probe: 87.7 cm⁻¹
 - Resolution dominated by pump spectral width (11.77 nm ≈ 182 cm⁻¹)
+
+## 2026-02-26 — Time-resolved C₂, anti-Stokes axis, comparison plots, TBP
+
+### Added
+- `time_bandwidth_product()`: TBP = Δt_FWHM[fs] × Δν_FWHM[THz] for TL Gaussian (≈ 0.441);
+  printed in console and included in initial-pulse 3D plot titles
+- `compute_conv2_2d()`: time-resolved probe convolution; output on anti-Stokes absolute
+  wavenumber axis ν_AS = ν_pump_center + Ω (~15 292 cm⁻¹ ≈ 654 nm)
+- `plot_conv2_3d()`: 3D surface of C₂(ν_AS, t) saved as PDF + interactive HTML;
+  dual cm⁻¹ / nm tick labels on wavenumber axis; plotly hover shows both units
+- `comparison_c1.pdf`: centred C₁ marginals (zero-delay vs optimal-delay) on Raman axis
+- `comparison_c2.pdf`: centred C₂ marginals on anti-Stokes axis
+
+### Changed
+- `compute_conv2` replaced by `compute_conv2_2d` (time-resolved, anti-Stokes axis)
+- `plot_comparison` generalised: accepts `axis`, `xlabel`, `step_name`, `suptitle` params
+- `plot_projection` accepts optional `xlabel` kwarg (default `'Raman shift (cm⁻¹)'`)
+- `run_scenario` updated to 9 steps
+
+### Results (session 3)
+- Pump TBP = 0.441, Stokes TBP = 0.441 (TL Gaussians ✓)
+- Scenario A: ν_AS = 15292 cm⁻¹ (654 nm), C₂ RMS = 30 cm⁻¹
+- Scenario B: ν_AS = 15292 cm⁻¹ (654 nm), C₂ RMS = 92 cm⁻¹ (less pump chirp)

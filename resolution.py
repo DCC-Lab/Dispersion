@@ -118,6 +118,14 @@ def temporal_fwhm_fs(fwhm_spectral_nm, lambda0_nm):
     return tau * np.sqrt(2.0 * np.log(2.0)) * 1e15
 
 
+def time_bandwidth_product(fwhm_spectral_nm, lambda0_nm):
+    """TBP = Δt_FWHM[fs] × Δν_FWHM[THz] for a transform-limited Gaussian (≈ 0.441)."""
+    fwhm_t_fs    = temporal_fwhm_fs(fwhm_spectral_nm, lambda0_nm)
+    delta_nu_THz = c * (fwhm_spectral_nm * 1e-9) / (lambda0_nm * 1e-9)**2 * 1e-12
+    tbp = fwhm_t_fs * delta_nu_THz * 1e-3   # fs × THz × 1e-3 = dimensionless
+    return fwhm_t_fs, delta_nu_THz, tbp
+
+
 def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
                 material='stih6',
                 n_spec=N_SPEC, n_time=N_TIME):
@@ -311,29 +319,48 @@ def find_optimal_delay(pump, stokes, raman_axis):
     return opt_d
 
 
-def compute_conv2(C1_marginal, pump_marginal_tuple, raman_axis):
+def compute_conv2_2d(C1_2d, pump, t_common, raman_axis):
     """
-    Degenerate probe broadening:
-        C₂(Ω) = C₁(Ω) ∗ P_pump(Ω)   (convolution)
+    Time-resolved anti-Stokes signal:
+        C₂(ν_AS, t) = ∫ C₁(Ω, t) · P_pump(ν_AS − Ω, t) dΩ
 
-    pump_marginal_tuple : (wn_axis, intensity) for the pump spectral marginal
+    Anti-Stokes axis: ν_AS = ν_pump_center + Ω  (~15 k cm⁻¹, ~654 nm)
+
+    The pump kernel is time-dependent (different spectral slices arrive at different
+    times due to chirp), which is the essence of spectral focusing.
+
+    Returns
+    -------
+    as_axis : [n_raman]         anti-Stokes wavenumbers [cm⁻¹]
+    C2_2d   : [n_raman, n_time] time-resolved signal
     """
-    pump_wn, pump_int = pump_marginal_tuple
-    dOmega = raman_axis[1] - raman_axis[0]
+    nu_pump_center = 1e7 / pump['lambda0_nm']
+    as_axis = nu_pump_center + raman_axis
 
-    # Centre the pump kernel at 0
-    wn_center = np.average(pump_wn, weights=pump_int + 1e-30)
-    pump_shift = pump_wn - wn_center
-    n_half = int(np.ceil((pump_shift.max() - pump_shift.min()) / dOmega / 2)) + 1
-    pump_axis_c = np.arange(-n_half, n_half + 1) * dOmega
+    # Interpolate pump intensity onto t_common  →  P[n_pump, n_time]
+    P = _interp_rows(pump['I_prop'], pump['t_ps_prop'], t_common)
 
-    f = interp1d(pump_shift, pump_int, bounds_error=False, fill_value=0.0)
-    pump_kernel = np.maximum(f(pump_axis_c), 0.0)
-    if pump_kernel.sum() > 0:
-        pump_kernel /= pump_kernel.sum()
+    pump_wn = pump['wn_cm1']
+    dOmega  = raman_axis[1] - raman_axis[0]
 
-    C2 = np.maximum(fftconvolve(C1_marginal, pump_kernel, mode='same'), 0.0)
-    return C2
+    # Precompute centred kernel axis (fixed for all time steps)
+    pump_marginal = P.sum(axis=1)
+    wn_center     = np.average(pump_wn, weights=pump_marginal + 1e-30)
+    pump_shift    = pump_wn - wn_center
+    n_half        = int(np.ceil((pump_shift.max() - pump_shift.min()) / dOmega / 2)) + 1
+    pump_axis_c   = np.arange(-n_half, n_half + 1) * dOmega
+
+    # Vectorised interpolation across all time steps at once  →  P_kern[n_kern, n_time]
+    f_pump  = interp1d(pump_shift, P, axis=0, bounds_error=False, fill_value=0.0)
+    P_kern  = np.maximum(f_pump(pump_axis_c), 0.0)
+    P_sum   = P_kern.sum(axis=0)
+    P_norm  = P_kern / (P_sum[np.newaxis, :] + 1e-30)   # normalised time-varying kernels
+
+    C2_2d = np.zeros_like(C1_2d)
+    for ti in range(len(t_common)):
+        C2_2d[:, ti] = np.maximum(
+            fftconvolve(C1_2d[:, ti], P_norm[:, ti], mode='same'), 0.0)
+    return as_axis, C2_2d
 
 
 def spectral_stats(raman_axis, spectrum):
@@ -430,7 +457,55 @@ def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name, output_dir):
     return fig
 
 
-def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name, output_dir):
+def plot_conv2_3d(t_ps, as_axis, C2_2d, title, step_name, output_dir):
+    """3-D surface: time × anti-Stokes wavenumber × signal. PDF + interactive HTML.
+    Y-axis shows cm⁻¹ with nm values added to tick labels.
+    """
+    C2_norm = C2_2d / (C2_2d.max() or 1.0)
+    T, AS = np.meshgrid(t_ps, as_axis)
+
+    fig = plt.figure(figsize=(11, 7))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_surface(T, AS, C2_norm, cmap='plasma', alpha=0.9, rcount=60, ccount=60)
+    ax.set_xlabel('Time (ps)', labelpad=8)
+    ax.set_ylabel('Anti-Stokes (cm⁻¹)', labelpad=8)
+    ax.set_zlabel('Signal (norm.)', labelpad=8)
+
+    # Dual cm⁻¹/nm tick labels on y-axis (FixedLocator required before set_yticklabels)
+    yticks = [v for v in ax.get_yticks() if as_axis.min() <= v <= as_axis.max()]
+    ax.set_yticks(yticks)
+    ytick_labels = [f'{v:.0f}\n({1e7/v:.0f} nm)' for v in yticks]
+    ax.set_yticklabels(ytick_labels, fontsize=7)
+
+    ax.set_title(title, pad=12)
+    plt.tight_layout()
+    plt.show(block=False)
+    plt.pause(0.3)
+    _save(fig, step_name, output_dir)
+
+    if _PLOTLY:
+        nm_vals = 1e7 / as_axis
+        nm_grid = np.tile(nm_vals[:, np.newaxis], (1, len(t_ps)))
+        pfig = go.Figure(data=[go.Surface(
+            x=T, y=AS, z=C2_norm,
+            customdata=nm_grid,
+            hovertemplate=(
+                'Time: %{x:.2f} ps<br>'
+                'ν_AS: %{y:.0f} cm⁻¹  (%{customdata:.1f} nm)<br>'
+                'Signal: %{z:.3f}<extra></extra>'),
+            colorscale='Plasma', opacity=0.9)])
+        pfig.update_layout(
+            title=title,
+            scene=dict(xaxis_title='Time (ps)',
+                       yaxis_title='Anti-Stokes (cm⁻¹)',
+                       zaxis_title='Signal (norm.)'),
+            width=900, height=650)
+        _save_plotly(pfig, step_name, output_dir)
+    return fig
+
+
+def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name, output_dir,
+                    xlabel='Raman shift (cm⁻¹)'):
     """1-D spectral projection with RMS annotation."""
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(raman_axis, C2 / C2.max(), lw=2, color='steelblue')
@@ -439,7 +514,7 @@ def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name, output_
     ax.axvspan(nu_bar - sigma_rms, nu_bar + sigma_rms,
                alpha=0.15, color='red',
                label=f'RMS width: {sigma_rms:.1f} cm⁻¹')
-    ax.set_xlabel('Raman shift (cm⁻¹)')
+    ax.set_xlabel(xlabel)
     ax.set_ylabel('Intensity (norm.)')
     ax.set_title(title)
     ax.legend()
@@ -450,30 +525,33 @@ def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name, output_
     return fig
 
 
-def plot_comparison(raman_axis,
-                    C2_zero, nu_zero, sig_zero,
-                    C2_opt,  nu_opt,  sig_opt,
-                    output_dir):
+def plot_comparison(axis,
+                    C_zero, nu_zero, sig_zero,
+                    C_opt,  nu_opt,  sig_opt,
+                    output_dir,
+                    step_name='comparison',
+                    xlabel='Shift − centroid (cm⁻¹)',
+                    suptitle='Spectral resolution — centred comparison'):
     """Side-by-side spectral projections centred at their respective centroids."""
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
     datasets = [
-        (C2_zero, nu_zero, sig_zero, 'Zero delay',    'steelblue',  axes[0]),
-        (C2_opt,  nu_opt,  sig_opt,  'Optimal delay', 'darkorange', axes[1]),
+        (C_zero, nu_zero, sig_zero, 'Zero delay',    'steelblue',  axes[0]),
+        (C_opt,  nu_opt,  sig_opt,  'Optimal delay', 'darkorange', axes[1]),
     ]
-    for C2, nu_bar, sigma, label, color, ax in datasets:
-        ax.plot(raman_axis - nu_bar, C2 / C2.max(), lw=2, color=color, label=label)
+    for C, nu_bar, sigma, label, color, ax in datasets:
+        ax.plot(axis - nu_bar, C / C.max(), lw=2, color=color, label=label)
         ax.axvline(0, color='red', lw=1.0, ls='--')
         ax.axvspan(-sigma, sigma, alpha=0.15, color='red',
                    label=f'RMS: {sigma:.1f} cm⁻¹\nCenter: {nu_bar:.1f} cm⁻¹')
-        ax.set_xlabel('Raman shift − centroid (cm⁻¹)')
+        ax.set_xlabel(xlabel)
         ax.set_title(label)
         ax.legend(fontsize=9)
     axes[0].set_ylabel('Intensity (norm.)')
-    fig.suptitle('CARS spectral resolution — centred comparison', fontsize=12)
+    fig.suptitle(suptitle, fontsize=12)
     plt.tight_layout()
     plt.show(block=False)
     plt.pause(0.3)
-    _save(fig, 'comparison', output_dir)
+    _save(fig, step_name, output_dir)
     return fig
 
 
@@ -496,33 +574,35 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
     raman_axis = np.linspace(RAMAN_MIN_CM1, RAMAN_MAX_CM1, N_RAMAN)
 
     # ── [1] Build pump ────────────────────────────────────────
-    print(f"\n[1/8] Building pump …")
+    print(f"\n[1/9] Building pump …")
     pump = build_pulse(PUMP_FWHM_NM, PUMP_LAMBDA0_NM, pump_glass_mm,
                        GLASS_MATERIAL, N_SPEC, N_TIME)
-    print(f"  τ_TL ≈ {temporal_fwhm_fs(PUMP_FWHM_NM, PUMP_LAMBDA0_NM):.1f} fs  "
-          f"GD spread ≈ {pump['gd_ps'].max()-pump['gd_ps'].min():.3f} ps")
+    p_fwhm_fs, p_dnu_THz, p_tbp = time_bandwidth_product(PUMP_FWHM_NM, PUMP_LAMBDA0_NM)
+    print(f"  τ_TL = {p_fwhm_fs:.1f} fs  Δν = {p_dnu_THz:.2f} THz  TBP = {p_tbp:.3f}  "
+          f"GD spread = {pump['gd_ps'].max()-pump['gd_ps'].min():.3f} ps")
 
     # ── [2] Build Stokes ──────────────────────────────────────
-    print(f"\n[2/8] Building Stokes …")
+    print(f"\n[2/9] Building Stokes …")
     stokes = build_pulse(STOKES_FWHM_NM, STOKES_LAMBDA0_NM, stokes_glass_mm,
                          GLASS_MATERIAL, N_SPEC, N_TIME)
-    print(f"  τ_TL ≈ {temporal_fwhm_fs(STOKES_FWHM_NM, STOKES_LAMBDA0_NM):.1f} fs  "
-          f"GD spread ≈ {stokes['gd_ps'].max()-stokes['gd_ps'].min():.3f} ps")
+    s_fwhm_fs, s_dnu_THz, s_tbp = time_bandwidth_product(STOKES_FWHM_NM, STOKES_LAMBDA0_NM)
+    print(f"  τ_TL = {s_fwhm_fs:.1f} fs  Δν = {s_dnu_THz:.2f} THz  TBP = {s_tbp:.3f}  "
+          f"GD spread = {stokes['gd_ps'].max()-stokes['gd_ps'].min():.3f} ps")
 
     # ── [3] Plot initial pulses ───────────────────────────────
-    print("\n[3/8] 3-D plots: initial (unchirped) pulses …")
+    print("\n[3/9] 3-D plots: initial (unchirped) pulses …")
     plot_pulse_3d(pump['t_ps_init'],   pump['lambdas_nm'],   pump['I_init'],
-                  f'Pump — initial  (λ₀={PUMP_LAMBDA0_NM} nm, '
-                  f'Δλ={PUMP_FWHM_NM} nm FWHM)',
+                  f'Pump — initial  (λ₀={PUMP_LAMBDA0_NM} nm, Δλ={PUMP_FWHM_NM} nm, '
+                  f'τ_TL={p_fwhm_fs:.0f} fs, TBP={p_tbp:.3f})',
                   'pump_step0_initial', output_dir=output_dir)
 
     plot_pulse_3d(stokes['t_ps_init'], stokes['lambdas_nm'], stokes['I_init'],
-                  f'Stokes — initial  (λ₀={STOKES_LAMBDA0_NM} nm, '
-                  f'Δλ={STOKES_FWHM_NM} nm FWHM)',
+                  f'Stokes — initial  (λ₀={STOKES_LAMBDA0_NM} nm, Δλ={STOKES_FWHM_NM} nm, '
+                  f'τ_TL={s_fwhm_fs:.0f} fs, TBP={s_tbp:.3f})',
                   'stokes_step0_initial', output_dir=output_dir)
 
     # ── [4] Plot propagated pulses ────────────────────────────
-    print("\n[4/8] 3-D plots: after glass propagation …")
+    print("\n[4/9] 3-D plots: after glass propagation …")
     plot_pulse_3d(pump['t_ps_prop'],   pump['lambdas_nm'],   pump['I_prop'],
                   f'Pump — after {pump_glass_mm} mm {GLASS_MATERIAL.upper()}',
                   'pump_step1_propagated', output_dir=output_dir)
@@ -532,51 +612,80 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
                   'stokes_step1_propagated', output_dir=output_dir)
 
     # ── [5] Conv 1 — zero delay ───────────────────────────────
-    print("\n[5/8] Raman excitation spectrum — zero delay …")
+    print("\n[5/9] Raman excitation spectrum — zero delay …")
     t_zero, C1_zero = compute_conv1(pump, stokes, raman_axis, delay_ps=0.0)
     plot_conv1_3d(t_zero, raman_axis, C1_zero,
                   'Raman excitation  C₁(Ω, t) — zero delay',
                   'conv1_zero_delay', output_dir=output_dir)
+    C1_zero_marg = C1_zero.sum(axis=1)
 
     # ── [6] Conv 1 — optimal delay ────────────────────────────
-    print("\n[6/8] Scanning for optimal Stokes delay …")
+    print("\n[6/9] Scanning for optimal Stokes delay …")
     opt_delay_ps = find_optimal_delay(pump, stokes, raman_axis)
     t_opt, C1_opt = compute_conv1(pump, stokes, raman_axis, delay_ps=opt_delay_ps)
     plot_conv1_3d(t_opt, raman_axis, C1_opt,
                   f'Raman excitation  C₁(Ω, t) — optimal δt = {opt_delay_ps:+.3f} ps',
                   'conv1_optimal_delay', output_dir=output_dir)
+    C1_opt_marg = C1_opt.sum(axis=1)
 
-    # ── [7] Conv 2 — degenerate probe broadening ──────────────
-    print("\n[7/8] Probe broadening (Conv 2) …")
-    pump_marginal = (pump['wn_cm1'], pump['I_prop'].sum(axis=1))
+    # ── [7] C₁ comparison (Raman axis) ───────────────────────
+    print("\n[7/9] C₁ comparison figure …")
+    c1nu_zero, c1sig_zero = spectral_stats(raman_axis, C1_zero_marg)
+    c1nu_opt,  c1sig_opt  = spectral_stats(raman_axis, C1_opt_marg)
+    plot_comparison(raman_axis,
+                    C1_zero_marg, c1nu_zero, c1sig_zero,
+                    C1_opt_marg,  c1nu_opt,  c1sig_opt,
+                    output_dir=output_dir,
+                    step_name='comparison_c1',
+                    xlabel='Raman shift − centroid (cm⁻¹)',
+                    suptitle='C₁ — Raman excitation, centred comparison')
 
-    C2_zero = compute_conv2(C1_zero.sum(axis=1), pump_marginal, raman_axis)
-    C2_opt  = compute_conv2(C1_opt.sum(axis=1),  pump_marginal, raman_axis)
+    # ── [8] Conv 2 — time-resolved anti-Stokes signal ─────────
+    print("\n[8/9] Anti-Stokes signal C₂ (Conv 2) …")
+    as_axis, C2_zero_2d = compute_conv2_2d(C1_zero, pump, t_zero, raman_axis)
+    as_axis, C2_opt_2d  = compute_conv2_2d(C1_opt,  pump, t_opt,  raman_axis)
 
-    nu_zero, sig_zero = spectral_stats(raman_axis, C2_zero)
-    nu_opt,  sig_opt  = spectral_stats(raman_axis, C2_opt)
+    plot_conv2_3d(t_zero, as_axis, C2_zero_2d,
+                  'sf-CARS signal  C₂(ν_AS, t) — zero delay',
+                  'conv2_zero_delay', output_dir=output_dir)
+    plot_conv2_3d(t_opt,  as_axis, C2_opt_2d,
+                  f'sf-CARS signal  C₂(ν_AS, t) — optimal δt = {opt_delay_ps:+.3f} ps',
+                  'conv2_optimal_delay', output_dir=output_dir)
+
+    C2_zero_marg = C2_zero_2d.sum(axis=1)
+    C2_opt_marg  = C2_opt_2d.sum(axis=1)
+    nu_zero, sig_zero = spectral_stats(as_axis, C2_zero_marg)
+    nu_opt,  sig_opt  = spectral_stats(as_axis, C2_opt_marg)
 
     print(f"\n  ── RESULTS ──────────────────────────────────────")
-    print(f"  Zero delay   : center = {nu_zero:.1f} cm⁻¹,  RMS = {sig_zero:.1f} cm⁻¹")
-    print(f"  Optimal delay: center = {nu_opt:.1f} cm⁻¹,  RMS = {sig_opt:.1f} cm⁻¹  "
-          f"(δt = {opt_delay_ps:+.3f} ps)")
+    print(f"  Zero delay   : ν_AS = {nu_zero:.1f} cm⁻¹ ({1e7/nu_zero:.1f} nm),  "
+          f"RMS = {sig_zero:.1f} cm⁻¹")
+    print(f"  Optimal delay: ν_AS = {nu_opt:.1f} cm⁻¹ ({1e7/nu_opt:.1f} nm),  "
+          f"RMS = {sig_opt:.1f} cm⁻¹  (δt = {opt_delay_ps:+.3f} ps)")
 
-    plot_projection(raman_axis, C2_zero, nu_zero, sig_zero,
-                    f'CARS spectrum — zero delay\n'
-                    f'center = {nu_zero:.1f} cm⁻¹,  RMS = {sig_zero:.1f} cm⁻¹',
-                    'conv2_zero_delay_projection', output_dir=output_dir)
+    plot_projection(as_axis, C2_zero_marg, nu_zero, sig_zero,
+                    f'sf-CARS signal — zero delay\n'
+                    f'ν_AS = {nu_zero:.1f} cm⁻¹ ({1e7/nu_zero:.1f} nm),  '
+                    f'RMS = {sig_zero:.1f} cm⁻¹',
+                    'conv2_zero_delay_projection', output_dir=output_dir,
+                    xlabel='Anti-Stokes (cm⁻¹)')
 
-    plot_projection(raman_axis, C2_opt, nu_opt, sig_opt,
-                    f'CARS spectrum — optimal delay (δt = {opt_delay_ps:+.3f} ps)\n'
-                    f'center = {nu_opt:.1f} cm⁻¹,  RMS = {sig_opt:.1f} cm⁻¹',
-                    'conv2_optimal_delay_projection', output_dir=output_dir)
+    plot_projection(as_axis, C2_opt_marg, nu_opt, sig_opt,
+                    f'sf-CARS signal — optimal delay (δt = {opt_delay_ps:+.3f} ps)\n'
+                    f'ν_AS = {nu_opt:.1f} cm⁻¹ ({1e7/nu_opt:.1f} nm),  '
+                    f'RMS = {sig_opt:.1f} cm⁻¹',
+                    'conv2_optimal_delay_projection', output_dir=output_dir,
+                    xlabel='Anti-Stokes (cm⁻¹)')
 
-    # ── [8] Comparison ────────────────────────────────────────
-    print("\n[8/8] Comparison figure …")
-    plot_comparison(raman_axis,
-                    C2_zero, nu_zero, sig_zero,
-                    C2_opt,  nu_opt,  sig_opt,
-                    output_dir=output_dir)
+    # ── [9] C₂ comparison (anti-Stokes axis) ─────────────────
+    print("\n[9/9] C₂ comparison figure …")
+    plot_comparison(as_axis,
+                    C2_zero_marg, nu_zero, sig_zero,
+                    C2_opt_marg,  nu_opt,  sig_opt,
+                    output_dir=output_dir,
+                    step_name='comparison_c2',
+                    xlabel='Anti-Stokes − centroid (cm⁻¹)',
+                    suptitle='C₂ — sf-CARS signal, centred comparison')
 
     print(f"\nOutputs saved in: {os.path.abspath(output_dir)}")
 
