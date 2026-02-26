@@ -225,13 +225,18 @@ def _interp_rows(I_src, t_src, t_dst):
 
 def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
     """
-    Raman excitation spectrum  C₁(Ω, t).
+    Raman excitation amplitude  C₁(Ω, t).
 
-        C₁(Ω, t) = Σₖ P(νₖ, t) · S_interp(νₖ + Ω, t + delay_ps)
+        C₁(Ω, t) = Σₖ E_pump(νₖ, t) · E_Stokes(νₖ − Ω, t + delay_ps)
+
+    where  E = √I  is the field amplitude (I_prop stores intensity).
+    This is the physically correct driving term for the Raman coherence:
+    ρ(Ω,t) ∝ E_pump(t) × E_Stokes*(t).  Using I × I instead of √I × √I
+    would square the coherence and narrow its spectral width by √2.
 
     Implementation is fully vectorised:
-    - S is interpolated once onto a fine wavenumber grid (n_fine points)
-    - For each Raman shift Ω the pump wavenumber slice pump_wn + Ω is
+    - sqrt(I_stokes) is interpolated once onto a fine wavenumber grid
+    - For each Raman shift Ω the pump wavenumber slice pump_wn − Ω is
       mapped to indices on that grid via a simple offset — no per-Ω loop.
 
     Parameters
@@ -243,7 +248,7 @@ def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
     Returns
     -------
     t_common : 1-D time axis [ps]
-    C1       : [n_raman, n_time]
+    C1       : [n_raman, n_time]  — Raman excitation amplitude (field units)
     """
     # Pump: shorter λ → higher ν.  Stokes: longer λ → lower ν.
     # CARS condition: ν_Stokes = ν_pump − Ω  (standard convention)
@@ -259,8 +264,9 @@ def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
     n_common = max(len(t_pump), len(t_stokes))
     t_common = np.linspace(t_min, t_max, n_common)
 
-    P = _interp_rows(pump['I_prop'],   t_pump,   t_common)   # [n_pump, n_t]
-    S = _interp_rows(stokes['I_prop'], t_stokes, t_common)   # [n_stokes, n_t]
+    # Use field amplitudes (sqrt of intensity) for physically correct CARS driving term
+    P = np.sqrt(_interp_rows(pump['I_prop'],   t_pump,   t_common))   # [n_pump, n_t]
+    S = np.sqrt(_interp_rows(stokes['I_prop'], t_stokes, t_common))   # [n_stokes, n_t]
 
     # ── build a fine wavenumber grid covering pump_wn − Ω for all Ω ──
     # Standard CARS: Stokes at ν_pump − Ω  (Stokes is lower ν)
@@ -321,8 +327,12 @@ def find_optimal_delay(pump, stokes, raman_axis):
 
 def compute_conv2_2d(C1_2d, pump, t_common, raman_axis):
     """
-    Time-resolved anti-Stokes signal:
-        C₂(ν_AS, t) = ∫ C₁(Ω, t) · P_pump(ν_AS − Ω, t) dΩ
+    Time-resolved anti-Stokes excitation amplitude:
+        C₂(ν_AS, t) = ∫ C₁(Ω, t) · E_pump(ν_AS − Ω, t) dΩ
+
+    where E_pump = √I_pump is the pump field amplitude and C₁ is the
+    Raman coherence amplitude (from compute_conv1).  The full CARS field
+    goes as E_pump × coherence, so the probe step is also at field level.
 
     Anti-Stokes axis: ν_AS = ν_pump_center + Ω  (~15 k cm⁻¹, ~654 nm)
 
@@ -332,13 +342,13 @@ def compute_conv2_2d(C1_2d, pump, t_common, raman_axis):
     Returns
     -------
     as_axis : [n_raman]         anti-Stokes wavenumbers [cm⁻¹]
-    C2_2d   : [n_raman, n_time] time-resolved signal
+    C2_2d   : [n_raman, n_time] time-resolved anti-Stokes excitation amplitude
     """
     nu_pump_center = 1e7 / pump['lambda0_nm']
     as_axis = nu_pump_center + raman_axis
 
-    # Interpolate pump intensity onto t_common  →  P[n_pump, n_time]
-    P = _interp_rows(pump['I_prop'], pump['t_ps_prop'], t_common)
+    # Use pump field amplitude (sqrt of intensity) — consistent with C₁ field-level treatment
+    P = np.sqrt(_interp_rows(pump['I_prop'], pump['t_ps_prop'], t_common))
 
     pump_wn = pump['wn_cm1']
     dOmega  = raman_axis[1] - raman_axis[0]
@@ -404,7 +414,7 @@ def plot_pulse_3d(t_ps, lambdas_nm, I_2d, title, step_name, output_dir):
                     rcount=60, ccount=60)
     ax.set_xlabel('Time (ps)', labelpad=8)
     ax.set_ylabel('Wavelength (nm)', labelpad=8)
-    ax.set_zlabel('Intensity (norm.)', labelpad=8)
+    ax.set_zlabel('Intensity I (norm.)', labelpad=8)
     ax.set_title(title, pad=12)
     plt.tight_layout()
     plt.show(block=False)
@@ -418,7 +428,7 @@ def plot_pulse_3d(t_ps, lambdas_nm, I_2d, title, step_name, output_dir):
             title=title,
             scene=dict(xaxis_title='Time (ps)',
                        yaxis_title='Wavelength (nm)',
-                       zaxis_title='Intensity (norm.)'),
+                       zaxis_title='Intensity I (norm.)'),
             width=900, height=650)
         _save_plotly(pfig, step_name, output_dir)
 
@@ -436,7 +446,7 @@ def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name, output_dir):
                     rcount=60, ccount=60)
     ax.set_xlabel('Time (ps)', labelpad=8)
     ax.set_ylabel('Raman shift (cm⁻¹)', labelpad=8)
-    ax.set_zlabel('Excitation (norm.)', labelpad=8)
+    ax.set_zlabel('Excitation ampl. (norm.)', labelpad=8)
     ax.set_title(title, pad=12)
     plt.tight_layout()
     plt.show(block=False)
@@ -450,7 +460,7 @@ def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name, output_dir):
             title=title,
             scene=dict(xaxis_title='Time (ps)',
                        yaxis_title='Raman shift (cm⁻¹)',
-                       zaxis_title='Excitation (norm.)'),
+                       zaxis_title='Excitation ampl. (norm.)'),
             width=900, height=650)
         _save_plotly(pfig, step_name, output_dir)
 
@@ -469,7 +479,7 @@ def plot_conv2_3d(t_ps, as_axis, C2_2d, title, step_name, output_dir):
     ax.plot_surface(T, AS, C2_norm, cmap='plasma', alpha=0.9, rcount=60, ccount=60)
     ax.set_xlabel('Time (ps)', labelpad=8)
     ax.set_ylabel('Anti-Stokes (cm⁻¹)', labelpad=8)
-    ax.set_zlabel('Signal (norm.)', labelpad=8)
+    ax.set_zlabel('AS ampl. (norm.)', labelpad=8)
 
     # Dual cm⁻¹/nm tick labels on y-axis (FixedLocator required before set_yticklabels)
     yticks = [v for v in ax.get_yticks() if as_axis.min() <= v <= as_axis.max()]
@@ -498,7 +508,7 @@ def plot_conv2_3d(t_ps, as_axis, C2_2d, title, step_name, output_dir):
             title=title,
             scene=dict(xaxis_title='Time (ps)',
                        yaxis_title='Anti-Stokes (cm⁻¹)',
-                       zaxis_title='Signal (norm.)'),
+                       zaxis_title='AS ampl. (norm.)'),
             width=900, height=650)
         _save_plotly(pfig, step_name, output_dir)
     return fig

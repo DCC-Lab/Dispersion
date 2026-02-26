@@ -61,3 +61,23 @@
 - Pump TBP = 0.441, Stokes TBP = 0.441 (TL Gaussians ✓)
 - Scenario A: ν_AS = 15292 cm⁻¹ (654 nm), C₂ RMS = 30 cm⁻¹
 - Scenario B: ν_AS = 15292 cm⁻¹ (654 nm), C₂ RMS = 92 cm⁻¹ (less pump chirp)
+
+## 2026-02-26 — Fix convolutions to field amplitude; document field vs. intensity
+
+### Fixed
+- `compute_conv1`: was computing I_pump × I_Stokes (intensity product), which squares the
+  Raman coherence and underestimates excitation bandwidth by √2. Now computes
+  √I_pump × √I_Stokes (field amplitude product) — the physically correct driving term
+  ρ(Ω,t) ∝ E_pump × E_Stokes.
+- `compute_conv2_2d`: pump probe kernel changed from I_pump to √I_pump (field level),
+  consistent with the C₂ = E_pump × coherence amplitude interpretation.
+- Z-axis labels updated: "Intensity I (norm.)" for pulse plots, "Excitation ampl. (norm.)"
+  for C₁, "AS ampl. (norm.)" for C₂.
+
+### Added / changed
+- README.md: new "Physical conventions — field vs. intensity" section documenting exactly
+  what each stored array and 3D plot axis represents, with the key formulas.
+
+### Results after fix (Scenario A, both 15 cm)
+- C₁ RMS (optimal delay): 26.9 cm⁻¹ (was 19.3 cm⁻¹ with intensity product — ratio √2 ✓)
+- C₂ RMS: 42.5 cm⁻¹ (was 30.2 cm⁻¹ — ratio √2 ✓)
