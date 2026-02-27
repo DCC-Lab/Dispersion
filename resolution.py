@@ -181,9 +181,15 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
     gd_s = gd_s_abs - gd_ref                                      # [s], relative to centre
     gd_ps = gd_s * 1e12
 
+    # Shared time window: wide enough to contain the full group-delay spread.
+    # Both the initial and propagated grids use this window so their plots are
+    # directly comparable on the same ps axis.
+    gd_spread = gd_s.max() - gd_s.min()
+    gd_half   = max(abs(gd_s.max()), abs(gd_s.min()))   # largest one-sided delay (handles asymmetry)
+    t_half    = (gd_half + 3.0 * tau_s) * 1.15           # signal extent + 3σ buffer + 15% margin
+
     # --- Initial (unchirped) field amplitude time grid ---  centred at t = 0
-    t_span_init = 8.0 * tau_s
-    t_s_init = np.linspace(-t_span_init / 2, t_span_init / 2, n_time)
+    t_s_init = np.linspace(-t_half, t_half, n_time)
     t_ps_init = t_s_init * 1e12
 
     E_init = np.zeros((n_spec, n_time))
@@ -191,8 +197,6 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
         E_init[i, :] = A[i] * np.exp(-t_s_init**2 / tau_s**2)    # field: exp(-t²/τ_E²)
 
     # --- Propagated field amplitude: each slice shifted by its group delay ---
-    gd_spread = gd_s.max() - gd_s.min()
-    t_half = max(gd_spread * 2.5, 5.0 * tau_s)
     t_s_prop = np.linspace(-t_half, t_half, n_time)
     t_ps_prop = t_s_prop * 1e12
 
