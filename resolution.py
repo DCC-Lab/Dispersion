@@ -85,7 +85,13 @@ def n_glass(wl_m, material='stih6'):
 
 
 def group_index(wl_m, material='stih6', delta=1e-12):
-    """Group index  n_g = n − λ · dn/dλ  (numerical central difference, δλ=1 pm)."""
+    """Group index  n_g = n − λ · dn/dλ  (numerical central difference, δλ=1 pm).
+
+    For normal dispersion (dn/dλ < 0), the term −λ·dn/dλ > 0, so n_g > n.
+    Because |dn/dλ| grows at shorter wavelengths, n_g is larger for blue (short λ)
+    than for red (long λ).  This makes blue photons travel slower through glass,
+    which is the physical origin of positive-chirp pulse stretching (see build_pulse).
+    """
     n_hi = n_glass(wl_m + delta, material)
     n_lo = n_glass(wl_m - delta, material)
     dn_dlambda = (n_hi - n_lo) / (2 * delta)
@@ -93,7 +99,11 @@ def group_index(wl_m, material='stih6', delta=1e-12):
 
 
 def group_delay(wl_m, glass_m, material='stih6'):
-    """Group delay [s] for a spectral component at wavelength wl_m through glass_m metres."""
+    """Group delay [s] for a spectral component at wavelength wl_m through glass_m metres.
+
+    Shorter λ (blue) → larger n_g → larger GD → arrives later through normally dispersive glass.
+    Longer  λ (red)  → smaller n_g → smaller GD → arrives earlier.
+    """
     return glass_m * group_index(wl_m, material) / c
 
 
@@ -126,6 +136,66 @@ def time_bandwidth_product(fwhm_spectral_nm, lambda0_nm):
     return fwhm_t_fs, delta_nu_THz, tbp
 
 
+def marginal_temporal_intensity(E_2d):
+    """Spectrally integrated instantaneous intensity  I(t) = Σᵢ E²(λᵢ, t).
+
+    Sums the per-wavelength intensity over the spectral axis (axis 0), giving the
+    total power delivered at each time step.
+
+    Why the marginal peak drops after chirping (even though each slice is unchanged)
+    ---------------------------------------------------------------------------------
+    Glass is a linear lossless medium: it only shifts the arrival time of each
+    spectral slice, leaving every slice's peak field amplitude A[i] intact.
+
+    *Before* propagation (transform-limited):
+        All n_spec slices peak simultaneously at t = 0.
+        I_marginal(0) = Σᵢ A[i]²  ← the FULL sum — maximum possible power.
+
+    *After* propagation (chirped, gd_spread >> τ_E):
+        Slice i peaks at t = gd_s[i]; slices no longer overlap.
+        At t ≈ gd_s[k], only slice k contributes appreciably:
+        I_marginal(gd_s[k]) ≈ A[k]²  ← power of ONE slice only.
+
+    Peak ratio ≈ max_k A[k]² / Σᵢ A[i]² = 1 / n_eff << 1,
+    where n_eff = Σᵢ A[i]² is the effective number of contributing slices.
+
+    Analogy: n_spec musicians each play at full volume.  Before chirping they
+    all play the SAME note at the same instant (full combined power).  After
+    chirping each plays alone in sequence — the instantaneous "loudness" is
+    that of a single musician, even though each one is just as loud as before.
+
+    Energy is conserved: ∫ I_marginal dt is identical before and after propagation.
+
+    Parameters
+    ----------
+    E_2d : ndarray, shape [n_spec, n_time]  — field amplitude (not intensity)
+
+    Returns
+    -------
+    I_marginal : ndarray, shape [n_time]
+    """
+    return np.sum(E_2d**2, axis=0)
+
+
+def _fwhm_ps(t_ps, y):
+    """Intensity FWHM [ps] of a 1-D profile y(t_ps) at the half-maximum level.
+
+    Uses linear interpolation to locate the two half-maximum crossings.
+    Returns NaN if the profile does not cross the half-maximum on both sides.
+    """
+    half = y.max() / 2.0
+    i_pk = np.argmax(y)
+    # Left crossing: y rises to the peak — interpolate on the ascending segment
+    seg_l = y[:i_pk + 1]
+    t_l   = t_ps[:i_pk + 1]
+    t_left = np.interp(half, seg_l, t_l) if seg_l.min() < half else np.nan
+    # Right crossing: y falls from the peak — reverse so values are ascending for interp
+    seg_r = y[i_pk:][::-1]
+    t_r   = t_ps[i_pk:][::-1]
+    t_right = np.interp(half, seg_r, t_r) if seg_r.min() < half else np.nan
+    return t_right - t_left
+
+
 def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
                 material='stih6',
                 n_spec=N_SPEC, n_time=N_TIME):
@@ -154,6 +224,40 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
 
     For display: intensity = E_init**2 or E_prop**2 (done inside plot_pulse_3d).
     For convolutions: use E_prop directly — field amplitudes required.
+
+    Chirp physics
+    -------------
+    S-TIH6 has **normal dispersion** at 800–1050 nm: refractive index n decreases
+    with wavelength (dn/dλ < 0), giving positive group-velocity dispersion (GVD > 0).
+    The group index n_g = n − λ·dn/dλ satisfies n_g > n and is larger for shorter λ.
+
+    Consequence on group delays (gd_s, computed below):
+      - Shorter λ (blue, higher ν) → larger n_g → larger GD → gd_s[λ < λ₀] > 0
+        → Gaussian centre at t > 0  → blue component arrives LATER at the sample.
+      - Longer  λ (red,  lower ν) → smaller n_g → smaller GD → gd_s[λ > λ₀] < 0
+        → Gaussian centre at t < 0  → red  component arrives EARLIER at the sample.
+
+    In the **time domain** (at the sample), ω(t) increases with t — this is
+    conventionally called **positive chirp**.
+
+    In a **spatial snapshot** of the pulse propagating through space, the picture
+    is reversed: the leading edge (front, which has already travelled further) is the
+    red component (it moves faster); the trailing edge (back) is blue.  Scanning the
+    spatial picture from front to back, frequency decreases — sometimes called
+    "negative chirp" in this spatial convention.  Both descriptions refer to the
+    same physical situation; the code operates in the time domain.
+
+    Chirp consequences:
+      - **Pulse elongation**: the temporal extent grows from τ_TL to approximately
+        gd_spread = max(gd_s) − min(gd_s) (spectral-focusing limit, gd_spread >> τ_E).
+      - **Peak power reduction**: spectral components no longer all peak at t = 0.
+        Energy is conserved (∫I_marginal dt unchanged), but instantaneous peak power
+        drops roughly as τ_TL / gd_spread.  Use marginal_temporal_intensity() to
+        compute and visualise this effect explicitly.
+      - **Resolution improvement**: the chirp rate (ps/nm) sets the instantaneous
+        pump–Stokes frequency difference, which determines the CARS Raman linewidth.
+        More glass → more chirp → narrower CARS bandwidth (better resolution) at the
+        cost of lower peak signal.
     """
     tau_s = spectral_nm_to_tau(fwhm_spectral_nm, lambda0_nm)
 
@@ -196,7 +300,13 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
     for i in range(n_spec):
         E_init[i, :] = A[i] * np.exp(-t_s_init**2 / tau_s**2)    # field: exp(-t²/τ_E²)
 
-    # --- Propagated field amplitude: each slice shifted by its group delay ---
+    # --- Propagated field amplitude: each spectral slice shifted by its group delay ---
+    # gd_s[i] > 0 for blue (λ < λ₀): Gaussian peak is at t > 0 → blue arrives later.
+    # gd_s[i] < 0 for red  (λ > λ₀): Gaussian peak is at t < 0 → red  arrives earlier.
+    # The resulting time-domain field is positively chirped: ω increases with t.
+    # Because the slices are temporally separated, they no longer all peak at t = 0,
+    # so the total instantaneous power (marginal intensity) is lower than for the
+    # transform-limited pulse — see marginal_temporal_intensity().
     t_s_prop = np.linspace(-t_half, t_half, n_time)
     t_ps_prop = t_s_prop * 1e12
 
@@ -428,24 +538,32 @@ def _save_plotly(pfig, step_name, output_dir):
 
 
 def plot_pulse_3d(t_ps, lambdas_nm, E_2d, title, step_name, output_dir):
-    """3-D surface: time × wavelength × intensity  (E_2d is field amplitude; squared here)."""
-    I_2d = E_2d**2
-    T, L = np.meshgrid(t_ps, lambdas_nm)
+    """2-D heatmap (PDF) + 3-D surface (HTML): time × wavelength × intensity.
 
-    fig = plt.figure(figsize=(11, 7))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(T, L, I_2d, cmap='viridis', alpha=0.9,
-                    rcount=60, ccount=60)
-    ax.set_xlabel('Time (ps)', labelpad=8)
-    ax.set_ylabel('Wavelength (nm)', labelpad=8)
-    ax.set_zlabel('Intensity I', labelpad=8)
-    ax.set_title(title, pad=12)
+    The PDF uses pcolormesh (2-D) to avoid matplotlib surface aliasing that
+    occurs when the pulse peak spans only a few time samples in the large
+    time window (e.g. an 80 fs TL pulse in a 6 ps window).  The interactive
+    HTML retains the full 3-D surface rendered by plotly from all data points.
+
+    E_2d is field amplitude [n_spec, n_time]; intensity = E_2d² is computed here.
+    """
+    I_2d = E_2d**2
+
+    # ── matplotlib: 2-D heatmap (PDF) ──────────────────────────────────────────
+    fig, ax = plt.subplots(figsize=(10, 5))
+    pc = ax.pcolormesh(t_ps, lambdas_nm, I_2d, cmap='viridis', shading='auto')
+    fig.colorbar(pc, ax=ax, label='Intensity  E²')
+    ax.set_xlabel('Time (ps)')
+    ax.set_ylabel('Wavelength (nm)')
+    ax.set_title(title)
     plt.tight_layout()
     plt.show(block=False)
     plt.pause(0.3)
     _save(fig, step_name, output_dir)
 
+    # ── plotly: 3-D surface (HTML, interactive) ─────────────────────────────────
     if _PLOTLY:
+        T, L = np.meshgrid(t_ps, lambdas_nm)
         pfig = go.Figure(data=[go.Surface(x=T, y=L, z=I_2d,
                                           colorscale='Viridis', opacity=0.9)])
         pfig.update_layout(
@@ -454,6 +572,74 @@ def plot_pulse_3d(t_ps, lambdas_nm, E_2d, title, step_name, output_dir):
                        yaxis_title='Wavelength (nm)',
                        zaxis_title='Intensity I'),
             width=900, height=650)
+        _save_plotly(pfig, step_name, output_dir)
+
+    return fig
+
+
+def plot_marginal_comparison(pulse, beam_label, step_name, output_dir):
+    """Marginal temporal intensity I(t) = Σᵢ E²(λᵢ, t) — initial vs. chirped.
+
+    Both profiles share the same absolute-amplitude axis so the peak-power
+    reduction caused by glass propagation is visually unambiguous.  Annotated
+    with the peak ratio and temporal FWHM of each profile.
+
+    Parameters
+    ----------
+    pulse      : dict returned by build_pulse()
+    beam_label : str, e.g. 'Pump' or 'Stokes'
+    step_name  : str   output filename stem (no extension)
+    output_dir : str   output directory
+    """
+    t_ps   = pulse['t_ps_init']   # same time window for both (shared grid)
+    I_init = marginal_temporal_intensity(pulse['E_init'])
+    I_prop = marginal_temporal_intensity(pulse['E_prop'])
+
+    peak_init  = I_init.max()
+    peak_prop  = I_prop.max()
+    peak_ratio = peak_prop / peak_init
+    fwhm_init  = _fwhm_ps(t_ps, I_init)
+    fwhm_prop  = _fwhm_ps(t_ps, I_prop)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(t_ps, I_init, lw=2, color='steelblue',
+            label=f'Initial (transform-limited)  FWHM = {fwhm_init:.3f} ps')
+    ax.plot(t_ps, I_prop, lw=2, color='darkorange',
+            label=f'After glass (chirped)         FWHM = {fwhm_prop:.2f} ps')
+
+    # Annotate the peak-power reduction
+    annotation = (f'Peak ratio: {peak_ratio:.4f}×\n'
+                  f'(peak power reduced by {(1 - peak_ratio) * 100:.1f} %)\n'
+                  f'Energy conserved: area unchanged')
+    ax.annotate(annotation,
+                xy=(0.62, 0.72), xycoords='axes fraction', fontsize=9,
+                bbox=dict(boxstyle='round,pad=0.4', fc='lightyellow', alpha=0.85))
+
+    ax.set_xlabel('Time (ps)')
+    ax.set_ylabel(r'Marginal intensity  $\Sigma_i\,E^2(\lambda_i,\,t)$  [arb. units]')
+    ax.set_title(f'{beam_label} — marginal temporal intensity: initial vs. chirped\n'
+                 f'Glass: {pulse["glass_mm"]} mm {pulse["material"].upper()}  '
+                 f'| λ₀ = {pulse["lambda0_nm"]:.1f} nm')
+    ax.legend(fontsize=9)
+    plt.tight_layout()
+    plt.show(block=False)
+    plt.pause(0.3)
+    _save(fig, step_name, output_dir)
+
+    if _PLOTLY:
+        pfig = go.Figure()
+        pfig.add_trace(go.Scatter(
+            x=t_ps, y=I_init, mode='lines', name=f'Initial (TL)  FWHM={fwhm_init:.3f} ps',
+            line=dict(color='steelblue', width=2)))
+        pfig.add_trace(go.Scatter(
+            x=t_ps, y=I_prop, mode='lines',
+            name=f'After glass (chirped)  FWHM={fwhm_prop:.2f} ps',
+            line=dict(color='darkorange', width=2)))
+        pfig.update_layout(
+            title=f'{beam_label} — marginal temporal intensity (initial vs. chirped)',
+            xaxis_title='Time (ps)',
+            yaxis_title='Marginal intensity (arb. units)',
+            width=850, height=500)
         _save_plotly(pfig, step_name, output_dir)
 
     return fig
@@ -593,7 +779,7 @@ def plot_comparison(axis,
 
 def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
     """
-    Run the full 8-step chirping + CARS convolution pipeline for one
+    Run the full 10-step chirping + CARS convolution pipeline for one
     combination of glass lengths.  All plots are saved under output_dir.
     """
     sep = "=" * 60
@@ -606,23 +792,38 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
     raman_axis = np.linspace(RAMAN_MIN_CM1, RAMAN_MAX_CM1, N_RAMAN)
 
     # ── [1] Build pump ────────────────────────────────────────
-    print(f"\n[1/9] Building pump …")
+    print(f"\n[1/10] Building pump …")
     pump = build_pulse(PUMP_FWHM_NM, PUMP_LAMBDA0_NM, pump_glass_mm,
                        GLASS_MATERIAL, N_SPEC, N_TIME)
     p_fwhm_fs, p_dnu_THz, p_tbp = time_bandwidth_product(PUMP_FWHM_NM, PUMP_LAMBDA0_NM)
+    p_gd_spread = pump['gd_ps'].max() - pump['gd_ps'].min()
+    p_peak_ratio = (marginal_temporal_intensity(pump['E_prop']).max() /
+                    marginal_temporal_intensity(pump['E_init']).max())
     print(f"  τ_TL = {p_fwhm_fs:.1f} fs  Δν = {p_dnu_THz:.2f} THz  TBP = {p_tbp:.3f}  "
-          f"GD spread = {pump['gd_ps'].max()-pump['gd_ps'].min():.3f} ps")
+          f"GD spread = {p_gd_spread:.3f} ps")
+    print(f"  Chirp effect: peak power ratio (prop/init) = {p_peak_ratio:.4f}× "
+          f"(−{(1 - p_peak_ratio) * 100:.1f} %)  |  elongation ≈ {p_gd_spread * 1e3 / p_fwhm_fs:.0f}× TL")
 
     # ── [2] Build Stokes ──────────────────────────────────────
-    print(f"\n[2/9] Building Stokes …")
+    print(f"\n[2/10] Building Stokes …")
     stokes = build_pulse(STOKES_FWHM_NM, STOKES_LAMBDA0_NM, stokes_glass_mm,
                          GLASS_MATERIAL, N_SPEC, N_TIME)
     s_fwhm_fs, s_dnu_THz, s_tbp = time_bandwidth_product(STOKES_FWHM_NM, STOKES_LAMBDA0_NM)
+    s_gd_spread = stokes['gd_ps'].max() - stokes['gd_ps'].min()
+    s_peak_ratio = (marginal_temporal_intensity(stokes['E_prop']).max() /
+                    marginal_temporal_intensity(stokes['E_init']).max())
     print(f"  τ_TL = {s_fwhm_fs:.1f} fs  Δν = {s_dnu_THz:.2f} THz  TBP = {s_tbp:.3f}  "
-          f"GD spread = {stokes['gd_ps'].max()-stokes['gd_ps'].min():.3f} ps")
+          f"GD spread = {s_gd_spread:.3f} ps")
+    print(f"  Chirp effect: peak power ratio (prop/init) = {s_peak_ratio:.4f}× "
+          f"(−{(1 - s_peak_ratio) * 100:.1f} %)  |  elongation ≈ {s_gd_spread * 1e3 / s_fwhm_fs:.0f}× TL")
 
-    # ── [3] Plot initial pulses ───────────────────────────────
-    print("\n[3/9] 3-D plots: initial (unchirped) pulses …")
+    # ── [3] Marginal intensity: initial vs. chirped ──────────
+    print("\n[3/10] Marginal temporal intensity comparison (chirp effect on peak power) …")
+    plot_marginal_comparison(pump,   'Pump',   'pump_step1b_marginal',   output_dir)
+    plot_marginal_comparison(stokes, 'Stokes', 'stokes_step1b_marginal', output_dir)
+
+    # ── [4] Plot initial pulses ───────────────────────────────
+    print("\n[4/10] 3-D plots: initial (unchirped) pulses …")
     plot_pulse_3d(pump['t_ps_init'],   pump['lambdas_nm'],   pump['E_init'],
                   f'Pump — initial  (λ₀={PUMP_LAMBDA0_NM} nm, Δλ={PUMP_FWHM_NM} nm, '
                   f'τ_TL={p_fwhm_fs:.0f} fs, TBP={p_tbp:.3f})',
@@ -633,8 +834,8 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
                   f'τ_TL={s_fwhm_fs:.0f} fs, TBP={s_tbp:.3f})',
                   'stokes_step0_initial', output_dir=output_dir)
 
-    # ── [4] Plot propagated pulses ────────────────────────────
-    print("\n[4/9] 3-D plots: after glass propagation …")
+    # ── [5] Plot propagated pulses ────────────────────────────
+    print("\n[5/10] 3-D plots: after glass propagation …")
     plot_pulse_3d(pump['t_ps_prop'],   pump['lambdas_nm'],   pump['E_prop'],
                   f'Pump — after {pump_glass_mm} mm {GLASS_MATERIAL.upper()}',
                   'pump_step1_propagated', output_dir=output_dir)
@@ -643,16 +844,16 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
                   f'Stokes — after {stokes_glass_mm} mm {GLASS_MATERIAL.upper()}',
                   'stokes_step1_propagated', output_dir=output_dir)
 
-    # ── [5] Conv 1 — zero delay ───────────────────────────────
-    print("\n[5/9] Raman excitation spectrum — zero delay …")
+    # ── [6] Conv 1 — zero delay ───────────────────────────────
+    print("\n[6/10] Raman excitation spectrum — zero delay …")
     t_zero, C1_zero = compute_conv1(pump, stokes, raman_axis, delay_ps=0.0)
     plot_conv1_3d(t_zero, raman_axis, C1_zero,
                   'Raman excitation  C₁(Ω, t) — zero delay',
                   'conv1_zero_delay', output_dir=output_dir)
     C1_zero_marg = C1_zero.sum(axis=1)
 
-    # ── [6] Conv 1 — optimal delay ────────────────────────────
-    print("\n[6/9] Scanning for optimal Stokes delay …")
+    # ── [7] Conv 1 — optimal delay ────────────────────────────
+    print("\n[7/10] Scanning for optimal Stokes delay …")
     opt_delay_ps = find_optimal_delay(pump, stokes, raman_axis)
     t_opt, C1_opt = compute_conv1(pump, stokes, raman_axis, delay_ps=opt_delay_ps)
     plot_conv1_3d(t_opt, raman_axis, C1_opt,
@@ -660,8 +861,8 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
                   'conv1_optimal_delay', output_dir=output_dir)
     C1_opt_marg = C1_opt.sum(axis=1)
 
-    # ── [7] C₁ comparison (Raman axis) ───────────────────────
-    print("\n[7/9] C₁ comparison figure …")
+    # ── [8] C₁ comparison (Raman axis) ───────────────────────
+    print("\n[8/10] C₁ comparison figure …")
     c1nu_zero, c1sig_zero = spectral_stats(raman_axis, C1_zero_marg)
     c1nu_opt,  c1sig_opt  = spectral_stats(raman_axis, C1_opt_marg)
     plot_comparison(raman_axis,
@@ -672,8 +873,8 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
                     xlabel='Raman shift − centroid (cm⁻¹)',
                     suptitle='C₁ — Raman excitation, centred comparison')
 
-    # ── [8] Conv 2 — time-resolved anti-Stokes signal ─────────
-    print("\n[8/9] Anti-Stokes signal C₂ (Conv 2) …")
+    # ── [9] Conv 2 — time-resolved anti-Stokes signal ─────────
+    print("\n[9/10] Anti-Stokes signal C₂ (Conv 2) …")
     as_axis, C2_zero_2d = compute_conv2_2d(C1_zero, pump, t_zero, raman_axis)
     as_axis, C2_opt_2d  = compute_conv2_2d(C1_opt,  pump, t_opt,  raman_axis)
 
@@ -709,8 +910,8 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
                     'conv2_optimal_delay_projection', output_dir=output_dir,
                     xlabel='Anti-Stokes (cm⁻¹)')
 
-    # ── [9] C₂ comparison (anti-Stokes axis) ─────────────────
-    print("\n[9/9] C₂ comparison figure …")
+    # ── [10] C₂ comparison (anti-Stokes axis) ─────────────────
+    print("\n[10/10] C₂ comparison figure …")
     plot_comparison(as_axis,
                     C2_zero_marg, nu_zero, sig_zero,
                     C2_opt_marg,  nu_opt,  sig_opt,

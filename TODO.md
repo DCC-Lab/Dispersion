@@ -1,6 +1,9 @@
 # TODO
 
 ## High priority
+- [x] Verify chirp direction and peak-amplitude reduction after glass propagation
+      (confirmed positive chirp for normal dispersion; marginal intensity plots added;
+       peak ratio and elongation factor now printed in run log — 2026-02-27)
 - [ ] Add GVD-induced temporal broadening within each narrow-band spectral slice
       (currently only group delay is applied; second-order dispersion is ignored)
 - [ ] Verify conv1 output physically: for matched chirp rates the ridge should be

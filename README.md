@@ -167,6 +167,129 @@ show these field-amplitude quantities. To convert to observable intensities
 
 ---
 
+## Glass propagation and chirp physics
+
+### Dispersion sign for S-TIH6
+
+S-TIH6 (Schott dense flint glass) has **normal dispersion** throughout the visible
+and near-infrared: the refractive index *n* decreases with wavelength (dn/dλ < 0).
+This gives positive group-velocity dispersion (GVD > 0) at both 803 nm and 1041 nm.
+
+The group index is defined as:
+
+```
+n_g(λ) = n(λ) − λ · dn/dλ
+```
+
+Because dn/dλ < 0, the correction term −λ·dn/dλ is positive, so n_g > n.
+Moreover, |dn/dλ| is larger for shorter wavelengths, making n_g larger for blue
+than for red.  Since the group velocity is v_g = c / n_g, blue photons travel
+**slower** through the glass and arrive later.
+
+### Chirp direction — two equivalent conventions
+
+The two most common ways to describe the chirped pulse give opposite-looking answers
+but refer to the same physics:
+
+| View | Leading (early) | Trailing (late) | Frequency vs. time |
+|---|---|---|---|
+| **Time domain** (at the sample) | Red (low ν, long λ) | Blue (high ν, short λ) | ω(t) increases → **positive chirp** |
+| **Spatial snapshot** (pulse in flight) | Red (front, faster) | Blue (back, slower) | ν decreases front→back → "negative chirp" |
+
+The code operates in the **time domain**: each spectral component is placed at
+`t = gd_s(λᵢ)` in `E_prop`, where:
+
+```
+gd_s[λ < λ₀] > 0   →   blue arrives after the reference   (positive chirp)
+gd_s[λ > λ₀] < 0   →   red  arrives before the reference
+```
+
+The spatial intuition (leading edge is red) is physically equivalent; the sign
+appears "reversed" only because the time axis points forward whereas the spatial
+axis points in the direction of propagation.
+
+### Consequences of chirping
+
+**1. Pulse elongation**
+
+The chirped pulse spans a time range equal to the group-delay spread:
+
+```
+gd_spread = max(gd_s) − min(gd_s)          [ps]
+```
+
+In the spectral-focusing limit (gd_spread >> τ_TL), the pulse duration grows from
+τ_TL (transform limit, ~100 fs) to ≈ gd_spread (several picoseconds), an elongation
+factor of O(10²–10³).  The run log prints `GD spread` and `elongation ≈ N× TL`
+for each beam after glass propagation.
+
+**2. Peak power reduction**
+
+Because energy is conserved but distributed over a longer time window, peak power
+drops roughly as:
+
+```
+I_peak(chirped) / I_peak(TL)  ≈  τ_TL / gd_spread
+```
+
+This is verified quantitatively in the run log ("`peak power ratio`" line) and
+visualised in `pump_step1b_marginal.pdf` / `stokes_step1b_marginal.pdf`, which
+show the **marginal temporal intensity** I(t) = Σᵢ E²(λᵢ, t) before and after
+propagation on the same absolute-amplitude axis.
+
+Energy conservation holds: ∫ I(t) dt is identical before and after — only the
+instantaneous peak is reduced.
+
+**Physical intuition — why does the marginal peak drop when each slice is unchanged?**
+
+Glass is a linear lossless medium: it only shifts each spectral slice's arrival
+time, leaving its field amplitude A[i] intact.  The key is what happens to the
+SUM of slices at any given instant:
+
+| Situation | What happens at t = 0 (or t = gd_s[k]) | Marginal I |
+|---|---|---|
+| TL pulse (no glass) | All n_spec slices peak *together* at t = 0 | Σᵢ A[i]² (full sum) |
+| Chirped pulse (gd_spread >> τ_E) | Only slice k peaks at t = gd_s[k]; others are negligible | ≈ A[k]² (one slice) |
+
+The ratio of peak marginal intensities is therefore:
+
+```
+I_peak(chirped) / I_peak(TL)  =  max_k A[k]² / Σᵢ A[i]²  =  1 / n_eff
+```
+
+where n_eff = Σᵢ A[i]² is the effective number of slices that carry appreciable
+spectral weight under the Gaussian envelope.
+
+*Analogy:* picture n_spec musicians each playing at full volume.  Before chirping,
+they all play the same note simultaneously — the combined "loudness" is the sum of
+all their contributions.  After chirping, each musician plays alone in sequence at
+their own scheduled time-slot (gd_s[i]).  At any given moment you hear just one
+musician, even though each one is just as loud as before.  The total energy of the
+concert is unchanged; the instantaneous loudness is not.
+
+For the pump in Scenario A (15 cm S-TIH6): measured peak ratio ≈ 0.08,
+giving n_eff ≈ 12 — roughly 12 out of 80 spectral slices carry the dominant
+spectral weight under the Gaussian envelope.
+
+**3. Resolution improvement — the SF-CARS trade-off**
+
+In spectral focusing, the instantaneous pump–Stokes frequency difference at time t is:
+
+```
+Δν(t)  ≈  (chirp_pump − chirp_Stokes) × t      [cm⁻¹/ps × ps]
+```
+
+where chirp_pump and chirp_Stokes are the respective chromatic sweep rates (ps/nm).
+For matched chirp rates (same glass length), Δν is approximately constant across
+the pulse overlap → the CARS signal is produced at a single Raman shift per time slice.
+The resulting Raman linewidth shrinks to the transform limit of the convolution,
+far below the individual pulse bandwidths.
+
+More glass → larger gd_spread → slower chirp rate → narrower instantaneous bandwidth
+→ better spectral resolution.  The cost is proportionally lower peak signal (above).
+
+---
+
 ## Normalization policy
 
 The only normalization in the pipeline is `A /= A.max()` inside `build_pulse()`,

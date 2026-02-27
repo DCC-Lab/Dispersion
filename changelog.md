@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-02-27 — Fix pulse plot aliasing; document marginal intensity physics
+
+### Changed
+- **`plot_pulse_3d`**: replaced the matplotlib 3-D surface (`plot_surface` with
+  `rcount=60, ccount=60`) with a 2-D heatmap (`pcolormesh`) for the PDF output.
+  The old surface subsampled the 1000-point time axis to 60 columns, causing the
+  narrow (~15 sample) TL peak to alias into separate phantom peaks in the PDF.
+  The interactive HTML output (plotly) is unchanged — it renders all data points
+  and always showed the correct continuous Gaussian.
+- **`marginal_temporal_intensity` docstring**: added a full physics derivation
+  explaining why the marginal peak drops even though each individual spectral
+  slice retains its amplitude after glass propagation, with the "musicians playing
+  in unison vs. sequentially" analogy and the formula 1/n_eff.
+- **`readme.md`** — "Glass propagation and chirp physics" section: added
+  "Physical intuition" paragraph with the same analogy, a comparison table, and
+  the formula; also noted the measured n_eff ≈ 12 for the pump in Scenario A.
+
 ## 2026-02-27 — Cleanup: fix stale docstrings; update agents.md
 
 ### Changed
