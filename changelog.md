@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-02-27 — Remove post-initial normalizations; show chirping power reduction
+
+### Changed
+- **Physics fix (`compute_conv2_2d`)**: removed time-varying pump kernel normalization
+  (`P_norm = P_kern / P_kern.sum()`). The kernel now carries actual pump field amplitudes,
+  so chirping-induced peak amplitude reduction correctly propagates into C₂.
+- **All display plots**: removed per-array normalization (`/ array.max()`) from
+  `plot_pulse_3d`, `plot_conv1_3d`, `plot_conv2_3d`, `plot_projection`, and `plot_comparison`.
+  Plots now show absolute amplitudes — chirped pulses and their convolutions appear smaller
+  than transform-limited ones, which is the physically correct behaviour.
+- Updated axis labels: `'Intensity I (norm.)'` → `'Intensity I'`, `'Excitation ampl. (norm.)'`
+  → `'Excitation amplitude'`, `'AS ampl. (norm.)'` → `'AS amplitude'`,
+  `'Intensity (norm.)'` → `'Amplitude'`.
+- **Normalization policy**: the only normalization in the pipeline is `A /= A.max()` in
+  `build_pulse()`, applied once to the initial spectral field envelope. All downstream
+  quantities (E_prop, C₁, C₂) reflect physical amplitudes thereafter.
+
 ## 2026-02-26 — Initial rewrite of resolution.py
 
 ### Added

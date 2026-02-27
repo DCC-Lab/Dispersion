@@ -370,13 +370,13 @@ def compute_conv2_2d(C1_2d, pump, t_common, raman_axis):
     # Vectorised interpolation across all time steps at once  →  P_kern[n_kern, n_time]
     f_pump  = interp1d(pump_shift, P, axis=0, bounds_error=False, fill_value=0.0)
     P_kern  = np.maximum(f_pump(pump_axis_c), 0.0)
-    P_sum   = P_kern.sum(axis=0)
-    P_norm  = P_kern / (P_sum[np.newaxis, :] + 1e-30)   # normalised time-varying kernels
+    # No normalisation: P_kern carries the actual pump field amplitude at each time step.
+    # Chirping reduces the peak amplitude — this effect must propagate into C2.
 
     C2_2d = np.zeros_like(C1_2d)
     for ti in range(len(t_common)):
         C2_2d[:, ti] = np.maximum(
-            fftconvolve(C1_2d[:, ti], P_norm[:, ti], mode='same'), 0.0)
+            fftconvolve(C1_2d[:, ti], P_kern[:, ti], mode='same'), 0.0)
     return as_axis, C2_2d
 
 
@@ -412,17 +412,16 @@ def _save_plotly(pfig, step_name, output_dir):
 
 def plot_pulse_3d(t_ps, lambdas_nm, E_2d, title, step_name, output_dir):
     """3-D surface: time × wavelength × intensity  (E_2d is field amplitude; squared here)."""
-    I_2d   = E_2d**2
-    I_norm = I_2d / (I_2d.max() or 1.0)
+    I_2d = E_2d**2
     T, L = np.meshgrid(t_ps, lambdas_nm)
 
     fig = plt.figure(figsize=(11, 7))
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(T, L, I_norm, cmap='viridis', alpha=0.9,
+    ax.plot_surface(T, L, I_2d, cmap='viridis', alpha=0.9,
                     rcount=60, ccount=60)
     ax.set_xlabel('Time (ps)', labelpad=8)
     ax.set_ylabel('Wavelength (nm)', labelpad=8)
-    ax.set_zlabel('Intensity I (norm.)', labelpad=8)
+    ax.set_zlabel('Intensity I', labelpad=8)
     ax.set_title(title, pad=12)
     plt.tight_layout()
     plt.show(block=False)
@@ -430,13 +429,13 @@ def plot_pulse_3d(t_ps, lambdas_nm, E_2d, title, step_name, output_dir):
     _save(fig, step_name, output_dir)
 
     if _PLOTLY:
-        pfig = go.Figure(data=[go.Surface(x=T, y=L, z=I_norm,
+        pfig = go.Figure(data=[go.Surface(x=T, y=L, z=I_2d,
                                           colorscale='Viridis', opacity=0.9)])
         pfig.update_layout(
             title=title,
             scene=dict(xaxis_title='Time (ps)',
                        yaxis_title='Wavelength (nm)',
-                       zaxis_title='Intensity I (norm.)'),
+                       zaxis_title='Intensity I'),
             width=900, height=650)
         _save_plotly(pfig, step_name, output_dir)
 
@@ -445,16 +444,15 @@ def plot_pulse_3d(t_ps, lambdas_nm, E_2d, title, step_name, output_dir):
 
 def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name, output_dir):
     """3-D surface: time × Raman shift × excitation."""
-    C1_norm = C1_2d / (C1_2d.max() or 1.0)
     T, R = np.meshgrid(t_ps, raman_axis)
 
     fig = plt.figure(figsize=(11, 7))
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(T, R, C1_norm, cmap='inferno', alpha=0.9,
+    ax.plot_surface(T, R, C1_2d, cmap='inferno', alpha=0.9,
                     rcount=60, ccount=60)
     ax.set_xlabel('Time (ps)', labelpad=8)
     ax.set_ylabel('Raman shift (cm⁻¹)', labelpad=8)
-    ax.set_zlabel('Excitation ampl. (norm.)', labelpad=8)
+    ax.set_zlabel('Excitation amplitude', labelpad=8)
     ax.set_title(title, pad=12)
     plt.tight_layout()
     plt.show(block=False)
@@ -462,13 +460,13 @@ def plot_conv1_3d(t_ps, raman_axis, C1_2d, title, step_name, output_dir):
     _save(fig, step_name, output_dir)
 
     if _PLOTLY:
-        pfig = go.Figure(data=[go.Surface(x=T, y=R, z=C1_norm,
+        pfig = go.Figure(data=[go.Surface(x=T, y=R, z=C1_2d,
                                           colorscale='Hot', opacity=0.9)])
         pfig.update_layout(
             title=title,
             scene=dict(xaxis_title='Time (ps)',
                        yaxis_title='Raman shift (cm⁻¹)',
-                       zaxis_title='Excitation ampl. (norm.)'),
+                       zaxis_title='Excitation amplitude'),
             width=900, height=650)
         _save_plotly(pfig, step_name, output_dir)
 
@@ -479,15 +477,14 @@ def plot_conv2_3d(t_ps, as_axis, C2_2d, title, step_name, output_dir):
     """3-D surface: time × anti-Stokes wavenumber × signal. PDF + interactive HTML.
     Y-axis shows cm⁻¹ with nm values added to tick labels.
     """
-    C2_norm = C2_2d / (C2_2d.max() or 1.0)
     T, AS = np.meshgrid(t_ps, as_axis)
 
     fig = plt.figure(figsize=(11, 7))
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(T, AS, C2_norm, cmap='plasma', alpha=0.9, rcount=60, ccount=60)
+    ax.plot_surface(T, AS, C2_2d, cmap='plasma', alpha=0.9, rcount=60, ccount=60)
     ax.set_xlabel('Time (ps)', labelpad=8)
     ax.set_ylabel('Anti-Stokes (cm⁻¹)', labelpad=8)
-    ax.set_zlabel('AS ampl. (norm.)', labelpad=8)
+    ax.set_zlabel('AS amplitude', labelpad=8)
 
     # Dual cm⁻¹/nm tick labels on y-axis (FixedLocator required before set_yticklabels)
     yticks = [v for v in ax.get_yticks() if as_axis.min() <= v <= as_axis.max()]
@@ -505,7 +502,7 @@ def plot_conv2_3d(t_ps, as_axis, C2_2d, title, step_name, output_dir):
         nm_vals = 1e7 / as_axis
         nm_grid = np.tile(nm_vals[:, np.newaxis], (1, len(t_ps)))
         pfig = go.Figure(data=[go.Surface(
-            x=T, y=AS, z=C2_norm,
+            x=T, y=AS, z=C2_2d,
             customdata=nm_grid,
             hovertemplate=(
                 'Time: %{x:.2f} ps<br>'
@@ -516,7 +513,7 @@ def plot_conv2_3d(t_ps, as_axis, C2_2d, title, step_name, output_dir):
             title=title,
             scene=dict(xaxis_title='Time (ps)',
                        yaxis_title='Anti-Stokes (cm⁻¹)',
-                       zaxis_title='AS ampl. (norm.)'),
+                       zaxis_title='AS amplitude'),
             width=900, height=650)
         _save_plotly(pfig, step_name, output_dir)
     return fig
@@ -526,14 +523,14 @@ def plot_projection(raman_axis, C2, nu_bar, sigma_rms, title, step_name, output_
                     xlabel='Raman shift (cm⁻¹)'):
     """1-D spectral projection with RMS annotation."""
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(raman_axis, C2 / C2.max(), lw=2, color='steelblue')
+    ax.plot(raman_axis, C2, lw=2, color='steelblue')
     ax.axvline(nu_bar, color='red', lw=1.2, ls='--',
                label=f'Center: {nu_bar:.1f} cm⁻¹')
     ax.axvspan(nu_bar - sigma_rms, nu_bar + sigma_rms,
                alpha=0.15, color='red',
                label=f'RMS width: {sigma_rms:.1f} cm⁻¹')
     ax.set_xlabel(xlabel)
-    ax.set_ylabel('Intensity (norm.)')
+    ax.set_ylabel('Amplitude')
     ax.set_title(title)
     ax.legend()
     plt.tight_layout()
@@ -557,14 +554,14 @@ def plot_comparison(axis,
         (C_opt,  nu_opt,  sig_opt,  'Optimal delay', 'darkorange', axes[1]),
     ]
     for C, nu_bar, sigma, label, color, ax in datasets:
-        ax.plot(axis - nu_bar, C / C.max(), lw=2, color=color, label=label)
+        ax.plot(axis - nu_bar, C, lw=2, color=color, label=label)
         ax.axvline(0, color='red', lw=1.0, ls='--')
         ax.axvspan(-sigma, sigma, alpha=0.15, color='red',
                    label=f'RMS: {sigma:.1f} cm⁻¹\nCenter: {nu_bar:.1f} cm⁻¹')
         ax.set_xlabel(xlabel)
         ax.set_title(label)
         ax.legend(fontsize=9)
-    axes[0].set_ylabel('Intensity (norm.)')
+    axes[0].set_ylabel('Amplitude')
     fig.suptitle(suptitle, fontsize=12)
     plt.tight_layout()
     plt.show(block=False)
