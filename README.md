@@ -104,7 +104,7 @@ E(t, λᵢ) = A_E(λᵢ) · exp(−(t − τg(λᵢ))² / τ_E²)      [1]
 
 The intensity at (λᵢ, t) is recovered by squaring: `I(t,λᵢ) = E(t,λᵢ)²`.
 
-The 3D pulse plots labeled **"Intensity I (norm.)"** display `E_prop²` — squaring
+The 3D pulse plots labeled **"Intensity I"** display `E_prop²` — squaring
 is done inside `plot_pulse_3d`. This is what a photodetector measures.
 
 Key relationships between field and intensity Gaussians:
@@ -150,7 +150,7 @@ C₂(ν_AS, t) = ∫ C₁(Ω, t) · E_pump(ν_AS − Ω, t) dΩ       [3]
 
 where `ν_AS = ν_pump_center + Ω` (~15 292 cm⁻¹ ≈ 654 nm).
 
-The 3D plots labeled **"Excitation ampl. (norm.)"** and **"AS ampl. (norm.)"**
+The 3D plots labeled **"Excitation amplitude"** and **"AS amplitude"**
 show these field-amplitude quantities. To convert to observable intensities
 (e.g. photon counts), square the values.
 
@@ -159,8 +159,52 @@ show these field-amplitude quantities. To convert to observable intensities
 | Array / Plot | Quantity | Gaussian exponent |
 |---|---|---|
 | `E_init`, `E_prop` | Field amplitude E(t,λ) | exp(−t²/τ_E²) |
-| Pulse 3D plots z-axis | Intensity I = E² (norm.) | exp(−2t²/τ_E²) |
+| Pulse 3D plots z-axis | Intensity I = E² | exp(−2t²/τ_E²) |
 | `C₁(Ω, t)` | Raman coherence amplitude ∝ E_pump·E_Stokes | — |
-| C₁ 3D plots z-axis | Excitation ampl. (norm.) | — |
+| C₁ 3D plots z-axis | Excitation amplitude | — |
 | `C₂(ν_AS, t)` | Anti-Stokes field amplitude ∝ E_pump·C₁ | — |
-| C₂ 3D plots z-axis | AS ampl. (norm.) | — |
+| C₂ 3D plots z-axis | AS amplitude | — |
+
+---
+
+## Normalization policy
+
+The only normalization in the pipeline is `A /= A.max()` inside `build_pulse()`,
+applied once to the **initial spectral field envelope** before any propagation.
+All downstream quantities — `E_prop`, `C₁`, `C₂` — carry physically correct absolute
+amplitudes thereafter.
+
+Consequence: more chirping (more glass) means lower peak amplitude and lower peak signal.
+This is the intended behaviour: the simulation shows the effect of chirping on **power
+distribution**, not just on spectral shape.
+
+---
+
+## Delay scan — what "optimal delay" means here
+
+Each scenario is computed at two Stokes delays:
+
+### Zero delay (`delay_ps = 0`)
+The Stokes pulse is not time-shifted relative to the pump. Because both pulses are centred
+on their respective group-delay grids (reference = group delay of the central wavelength),
+zero delay means their temporal centres coincide. This is the natural starting point.
+
+### Optimal delay (`find_optimal_delay`)
+`find_optimal_delay` scans a range of Stokes time offsets δt and selects the one that
+**maximises the total integrated C₁ signal** — i.e., `Σ_{Ω,t} C₁(Ω, t)`.
+
+This is a **signal-strength criterion**, not a resolution criterion. It answers:
+> At what relative timing do the two chirped pulses overlap the most in time,
+> producing the strongest Raman excitation?
+
+For perfectly matched chirp rates (same glass, same wavelength) the answer is δt ≈ 0.
+When chirp rates are mismatched — as in Scenario B where the pump has only 5 cm of glass
+while the Stokes has 15 cm — the centre of mass of the pump's group-delay sweep arrives
+at a slightly different time than the Stokes's, and the optimal delay shifts accordingly.
+
+**What this delay does NOT represent:**
+It is not the delay that minimises the spectral width of C₁(Ω) (best resolution).
+For mismatched chirp rates those two optima differ.  The comparison plot
+(zero delay vs. optimal delay) therefore shows **the effect of temporal recentering on
+signal strength and spectral shape**, not a resolution-optimised result.
+The RMS values printed alongside are the resolution at each delay, for reference.

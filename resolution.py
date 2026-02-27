@@ -310,8 +310,18 @@ def find_optimal_delay(pump, stokes, raman_axis):
     Scan Stokes time delays and return the one that maximises the total
     integrated C₁ signal — i.e., the delay of maximum temporal overlap.
 
-    For perfectly matched chirp rates this is δt ≈ 0.  For mismatched
-    rates it may differ.  A coarser Raman grid is used for speed.
+    This is a signal-strength criterion, not a resolution criterion.
+    It answers the question: at what delay do the two chirped pulses
+    overlap the most in time, producing the strongest Raman excitation?
+
+    For perfectly matched chirp rates the answer is δt ≈ 0 (pulses centred
+    on each other).  For mismatched chirp rates (different glass lengths or
+    different centre wavelengths) it may shift slightly.
+
+    Note: maximising total C₁ signal does NOT guarantee minimum spectral
+    width (best resolution).  The delay that minimises the RMS width of
+    C₁(Ω) can differ, especially when pump and Stokes chirp rates are
+    mismatched.  A coarser Raman grid is used here for speed.
     """
     delays  = np.linspace(-DELAY_SCAN_PS_RANGE, DELAY_SCAN_PS_RANGE, DELAY_SCAN_N)
     raman_c = np.linspace(raman_axis.min(), raman_axis.max(), max(N_RAMAN // 3, 20))
@@ -327,7 +337,7 @@ def find_optimal_delay(pump, stokes, raman_axis):
     # Compute stats at optimal delay for reporting
     _, C1_opt = compute_conv1(pump, stokes, raman_c, delay_ps=opt_d)
     nu_bar, sigma = spectral_stats(raman_c, C1_opt.sum(axis=1))
-    print(f"  Optimal delay (max overlap): δt = {opt_d:.3f} ps  "
+    print(f"  Optimal delay (max signal): δt = {opt_d:.3f} ps  "
           f"→ center = {nu_bar:.1f} cm⁻¹,  RMS = {sigma:.1f} cm⁻¹")
     return opt_d
 
