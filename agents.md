@@ -2,7 +2,7 @@
 
 ## Branch: 3d-propagation
 
-## Current state (2026-02-26)
+## Current state (2026-02-27)
 `resolution.py` has been fully rewritten.  The key design decisions are recorded here
 so that any future agent can pick up without re-reading all code.
 
@@ -15,6 +15,8 @@ so that any future agent can pick up without re-reading all code.
 | `fftconvolve` for conv2 | Fast; the pump kernel is narrow and centred, so `mode='same'` is correct |
 | PDF + plotly HTML | PDF for publication, HTML for interactive 3-D rotation |
 | `TkAgg` backend | Interactive windows; change to `'Agg'` for headless / batch runs |
+| Normalisation only at init | `A /= A.max()` applied once to spectral field envelope in `build_pulse()`; all downstream arrays (E_prop, C₁, C₂) carry absolute amplitudes — chirping amplitude reduction is preserved and visible |
+| Optimal delay = max signal | `find_optimal_delay` maximises total C₁ signal (temporal overlap), NOT minimum spectral width. These two optima differ for mismatched chirp rates. Behaviour and distinction documented in README. |
 
 ### Physical conventions
 - `τ = FWHM_I / sqrt(2·ln2)` — field Gaussian parameter from intensity FWHM

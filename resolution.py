@@ -221,11 +221,12 @@ def build_pulse(fwhm_spectral_nm, lambda0_nm, glass_mm,
 #  CONVOLUTIONS
 # ─────────────────────────────────────────────
 
-def _interp_rows(I_src, t_src, t_dst):
-    """Interpolate each spectral row of I_src from t_src onto t_dst."""
-    out = np.zeros((I_src.shape[0], len(t_dst)))
-    for i in range(I_src.shape[0]):
-        f = interp1d(t_src, I_src[i], bounds_error=False, fill_value=0.0)
+def _interp_rows(E_src, t_src, t_dst):
+    """Interpolate each spectral row of E_src (field amplitude, [n_spec, n_time])
+    from time axis t_src onto t_dst.  Returns zeros outside the source range."""
+    out = np.zeros((E_src.shape[0], len(t_dst)))
+    for i in range(E_src.shape[0]):
+        f = interp1d(t_src, E_src[i], bounds_error=False, fill_value=0.0)
         out[i] = f(t_dst)
     return out
 
@@ -236,13 +237,14 @@ def compute_conv1(pump, stokes, raman_axis, delay_ps=0.0):
 
         C₁(Ω, t) = Σₖ E_pump(νₖ, t) · E_Stokes(νₖ − Ω, t + delay_ps)
 
-    where  E = √I  is the field amplitude (I_prop stores intensity).
+    E_pump and E_Stokes are field amplitudes stored directly in E_prop
+    (no square root required — the arrays are not intensities).
     This is the physically correct driving term for the Raman coherence:
-    ρ(Ω,t) ∝ E_pump(t) × E_Stokes*(t).  Using I × I instead of √I × √I
-    would square the coherence and narrow its spectral width by √2.
+    ρ(Ω,t) ∝ E_pump(t) × E_Stokes*(t).  Using intensities (I × I) instead
+    would square the coherence and artificially narrow its spectral width by √2.
 
     Implementation is fully vectorised:
-    - sqrt(I_stokes) is interpolated once onto a fine wavenumber grid
+    - E_Stokes is interpolated once onto a fine wavenumber grid
     - For each Raman shift Ω the pump wavenumber slice pump_wn − Ω is
       mapped to indices on that grid via a simple offset — no per-Ω loop.
 
@@ -347,9 +349,10 @@ def compute_conv2_2d(C1_2d, pump, t_common, raman_axis):
     Time-resolved anti-Stokes excitation amplitude:
         C₂(ν_AS, t) = ∫ C₁(Ω, t) · E_pump(ν_AS − Ω, t) dΩ
 
-    where E_pump = √I_pump is the pump field amplitude and C₁ is the
-    Raman coherence amplitude (from compute_conv1).  The full CARS field
-    goes as E_pump × coherence, so the probe step is also at field level.
+    where E_pump is the pump field amplitude stored directly in E_prop
+    (no square root — not an intensity), and C₁ is the Raman coherence
+    amplitude from compute_conv1.  The full CARS field goes as
+    E_pump × coherence, so the probe step is at field level throughout.
 
     Anti-Stokes axis: ν_AS = ν_pump_center + Ω  (~15 k cm⁻¹, ~654 nm)
 

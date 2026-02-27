@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-02-27 — Cleanup: fix stale docstrings; update agents.md
+
+### Changed
+- **`compute_conv1` docstring**: removed stale `E = √I` and `I_prop stores intensity`
+  phrasing. Arrays have been named `E_prop` and store field amplitudes directly since the
+  field-amplitude refactor; no square root is ever taken.
+- **`compute_conv2_2d` docstring**: removed stale `E_pump = √I_pump` phrasing; same reason.
+- **`_interp_rows`**: added docstring and renamed parameter `I_src → E_src` for consistency.
+- **`agents.md`**: updated to 2026-02-27; added normalization-policy and delay-criterion
+  decisions to the architecture table.
+- **README.md**: stale `(norm.)` labels removed from field/intensity summary table; added
+  Normalization policy section and Delay scan section explaining signal-strength criterion.
+
+## 2026-02-27 — Optimal-delay criterion reverted to max-signal; README documented
+
+### Changed
+- `find_optimal_delay` reverted to maximising total integrated C₁ signal (temporal-overlap
+  criterion). The docstring now explicitly states this is a **signal-strength criterion**,
+  not a resolution criterion, and notes the distinction for mismatched chirp rates.
+- README: added **Normalization policy** section and **Delay scan** section explaining what
+  zero delay and optimal delay represent and what the optimal delay does NOT mean.
+
 ## 2026-02-27 — Remove post-initial normalizations; show chirping power reduction
 
 ### Changed
