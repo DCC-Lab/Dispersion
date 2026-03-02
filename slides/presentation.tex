@@ -1,7 +1,8 @@
 % ============================================================
-% SF-CARS Dispersion Simulation — Beamer Presentation
-% Audience: master/PhD students in photonics engineering
+% SF-CARS Dispersion Simulation — Beamer Presentation (v2)
+% Audience: Master students in photonics
 % Theme: Metropolis (16:9)
+% Rule: slide title = take-away sentence; figures fill the slide
 % ============================================================
 \documentclass[aspectratio=169, 11pt]{beamer}
 
@@ -17,8 +18,6 @@
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit, calc}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
-\usepackage{multicol}
-\usepackage{subcaption}
 
 % ── Colours ─────────────────────────────────────────────────
 \definecolor{mblue}{RGB}{0, 90, 160}
@@ -26,1071 +25,421 @@
 \definecolor{mgreen}{RGB}{30, 140, 60}
 \definecolor{mgray}{RGB}{100, 100, 100}
 
-% ── Custom macros ────────────────────────────────────────────
+% ── Macros ───────────────────────────────────────────────────
 \newcommand{\wn}{\,\text{cm}^{-1}}
 \newcommand{\Epump}{E_{\mathrm{pump}}}
 \newcommand{\Estokes}{E_{\mathrm{Stokes}}}
 \newcommand{\neff}{n_{\mathrm{eff}}}
-\newcommand{\taug}{\tau_g}
-\newcommand{\taue}{\tau_E}
-\newcommand{\nuAS}{\nu_{\mathrm{AS}}}
 
-% ── Title metadata ───────────────────────────────────────────
+% ── Title ────────────────────────────────────────────────────
 \title{Chirping Laser Pulses for Spectral-Focusing CARS}
 \subtitle{Dispersion, Resolution, and Signal Trade-offs}
 \author{Justine Major}
 \date{\today}
-\institute{Maîtrise en génie physique}
+\institute{Maîtrise en biophotonique}
 
 % ============================================================
 \begin{document}
 % ============================================================
 
-% ── Title slide ─────────────────────────────────────────────
+% ──────────────────────────────────────────────────────────────
+% 1. TITLE
+% ──────────────────────────────────────────────────────────────
 \maketitle
 
-% ============================================================
-% SECTION 1 — INTRODUCTION
-% ============================================================
-\section{Introduction}
-
-% ── Slide 2: Motivation ──────────────────────────────────────
-\begin{frame}{Motivation: Imaging Myelin with Light}
-  \begin{columns}[T]
-    \column{0.55\textwidth}
-      \textbf{Goal:} chemically-selective, label-free imaging of myelin sheaths
-      in biological tissue.
-
-      \vspace{0.8em}
-      \begin{itemize}
-        \item Myelin is rich in \textbf{lipid CH$_2$ bonds}\\
-              $\Rightarrow$ strong Raman band near $\mathbf{3200\wn}$
-        \item Conventional fluorescence: requires exogenous labels,\\
-              can perturb the sample
-        \item Spontaneous Raman: chemically selective, but\\
-              signal is \emph{weak} — long acquisition times
-      \end{itemize}
-
-      \vspace{0.8em}
-      \textbf{Solution:} \alert{CARS (Coherent Anti-Stokes Raman Scattering)}
-      \begin{itemize}
-        \item Coherent drive $\Rightarrow$ signal scales as $N^2$ (vs.\ $N$ for spontaneous)
-        \item $10^4$–$10^6\times$ faster than spontaneous Raman
-        \item No labels required
-      \end{itemize}
-
-    \column{0.42\textwidth}
-      \begin{block}{Raman band of interest}
-        \centering
-        \vspace{0.4em}
-        \begin{tikzpicture}
-          \begin{axis}[
-            width=5.5cm, height=3.5cm,
-            xlabel={Raman shift (cm$^{-1}$)},
-            ylabel={Intensity (a.u.)},
-            xmin=2500, xmax=3800,
-            ymin=0, ymax=1.2,
-            xtick={2700,3000,3200,3500},
-            xticklabel style={font=\tiny},
-            yticklabel style={font=\tiny},
-            xlabel style={font=\small},
-            ylabel style={font=\small},
-            axis line style={thin},
-            tick style={thin},
-          ]
-            \addplot[thick, mblue, samples=80, domain=2900:3600]
-              {0.9*exp(-((x-3200)/120)^2) + 0.6*exp(-((x-2900)/80)^2)};
-            \draw[dashed, mgray] (axis cs:3200,0) -- (axis cs:3200,1.0);
-            \node[font=\tiny, anchor=west] at (axis cs:3220,0.85) {CH$_2$};
-          \end{axis}
-        \end{tikzpicture}
-        \vspace{0.2em}
-        {\small Target: $\sim 3200\wn$ CH$_2$ stretch}
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 3: CARS Principle ──────────────────────────────────
-\begin{frame}{CARS: Four-Wave Mixing Principle}
-  \begin{columns}[T]
-    \column{0.48\textwidth}
-      \textbf{Energy-level picture:}
-
-      \vspace{0.6em}
-      \begin{tikzpicture}[scale=0.85]
+% ──────────────────────────────────────────────────────────────
+% 2. CARS PHYSICS
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{CARS detects lipid bond vibrations coherently, without labels}
+  \begin{columns}[c]
+    \column{0.50\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.95]
         % Ground state
-        \draw[very thick] (0,0) -- (3.5,0) node[right,font=\small] {$|g\rangle$};
+        \draw[very thick] (0,0) -- (3.5,0)
+          node[right, font=\small] {$|g\rangle$};
         % Raman level
-        \draw[very thick] (0,1.2) -- (3.5,1.2) node[right,font=\small] {$|\nu\rangle$};
+        \draw[very thick] (0,1.2) -- (3.5,1.2)
+          node[right, font=\small] {$|\nu\rangle$};
         % Virtual states
-        \draw[thick, dashed, mgray] (0.6,3.5) -- (1.8,3.5);
+        \draw[thick, dashed, mgray] (0.5,3.5) -- (1.9,3.5);
         \draw[thick, dashed, mgray] (2.2,4.2) -- (3.2,4.2);
-        % Pump (up)
-        \draw[-{Stealth[scale=1.3]}, mblue, thick] (0.8,0) -- (0.8,3.5)
-              node[midway, left, font=\small] {$\omega_p$};
-        % Stokes (down)
-        \draw[-{Stealth[scale=1.3]}, morange, thick] (1.6,3.5) -- (1.6,1.2)
-              node[midway, right, font=\small] {$\omega_S$};
-        % Probe / pump 2 (up)
-        \draw[-{Stealth[scale=1.3]}, mblue, thick] (2.4,1.2) -- (2.4,4.2)
-              node[midway, left, font=\small] {$\omega_p$};
-        % Anti-Stokes (down)
-        \draw[-{Stealth[scale=1.3]}, mgreen, very thick] (3.0,4.2) -- (3.0,0)
-              node[midway, right, font=\small] {\textbf{$\omega_{\rm AS}$}};
-        % Raman resonance brace
+        % Pump up
+        \draw[-{Stealth[scale=1.3]}, mblue, thick]
+          (0.8,0) -- (0.8,3.5)
+          node[midway, left, font=\small] {$\omega_p$};
+        % Stokes down
+        \draw[-{Stealth[scale=1.3]}, morange, thick]
+          (1.6,3.5) -- (1.6,1.2)
+          node[midway, right, font=\small] {$\omega_S$};
+        % Probe up
+        \draw[-{Stealth[scale=1.3]}, mblue, thick]
+          (2.4,1.2) -- (2.4,4.2)
+          node[midway, left, font=\small] {$\omega_p$};
+        % Anti-Stokes down
+        \draw[-{Stealth[scale=1.3]}, mgreen, very thick]
+          (3.0,4.2) -- (3.0,0)
+          node[midway, right, font=\small] {\textbf{$\omega_{\mathrm{AS}}$}};
+        % Raman arrow
         \draw[{Stealth[scale=0.8]}-{Stealth[scale=0.8]}, mgray]
-              (3.7,0) -- (3.7,1.2) node[midway, right, font=\tiny] {$\Omega$};
+          (3.8,0) -- (3.8,1.2)
+          node[midway, right, font=\tiny] {$\Omega$};
+        % Resonance condition
+        \node[font=\footnotesize, align=center] at (1.9,-0.7)
+          {$\omega_{\mathrm{AS}} = 2\omega_p - \omega_S$};
+        \node[font=\footnotesize, align=center] at (1.9,-1.15)
+          {resonance: $\Omega = \omega_p - \omega_S$};
       \end{tikzpicture}
-
-    \column{0.48\textwidth}
-      \textbf{Phase-matching condition:}
-      \[
-        \omega_{\rm AS} = 2\omega_p - \omega_S
-      \]
-
-      \vspace{0.5em}
-      \textbf{Resonance condition:}
-      \[
-        \Omega = \omega_p - \omega_S \approx \omega_{\rm Raman}
-      \]
-
-      \vspace{0.5em}
-      \textbf{Signal scales as:}
-      \[
-        I_{\rm CARS} \propto |A_{\rm Raman}(\Omega)|^2 \cdot I_p^2 \cdot I_S
-      \]
-
-      \vspace{0.6em}
-      \begin{itemize}
-        \item Anti-Stokes \textcolor{mgreen}{$\omega_{\rm AS}$} is blue-shifted\\
-              away from excitation $\Rightarrow$ easy to detect
-        \item Here: pump at \SI{803}{nm}, Stokes at \SI{1041}{nm}\\
-              $\Rightarrow$ anti-Stokes $\approx$ \SI{654}{nm} ($\approx 15\,292\wn$)
-      \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ── Slide 4: Spectral Focusing Concept ───────────────────────
-\begin{frame}{Spectral Focusing: Chirp as a Spectral Filter}
-  \begin{columns}[T]
-    \column{0.5\textwidth}
-      \textbf{Without chirp (transform-limited):}
-      \begin{itemize}
-        \item Both beams are broad in frequency
-        \item All frequency pairs $(\omega_p, \omega_S)$ overlap\\
-              simultaneously
-        \item Many Raman modes excited at once\\
-              $\Rightarrow$ \alert{poor spectral resolution}
-      \end{itemize}
-
-      \vspace{0.8em}
-      \textbf{With matched chirp (spectral focusing):}
-      \begin{itemize}
-        \item Glass disperses each pulse: each colour arrives\\
-              at a different time
-        \item At any instant $t$, only one narrow frequency\\
-              pair $(\omega_p(t),\,\omega_S(t))$ is active
-        \item Instantaneous beat frequency \emph{constant}:\\
-              $\omega_p(t) - \omega_S(t) \approx \Omega_0$
-        \item $\Rightarrow$ \textcolor{mgreen}{\textbf{single Raman mode addressed per time slice}}
-      \end{itemize}
 
     \column{0.47\textwidth}
-      \begin{tikzpicture}[scale=0.8]
-        % TL pulses
-        \node[font=\small, align=center] at (1.5,4.4) {\textbf{Transform-limited}};
-        \fill[mblue!25] (0.2,2.8) rectangle (2.8,4.2);
-        \fill[morange!25] (0.2,2.0) rectangle (2.8,3.4);
-        \draw[mblue, thick] (0.2,2.8) rectangle (2.8,4.2);
-        \draw[morange, thick] (0.2,2.0) rectangle (2.8,3.4);
-        \node[mblue, font=\small] at (1.5,3.9) {pump};
-        \node[morange, font=\small] at (1.5,2.3) {Stokes};
-        \draw[->, mgray] (-0.1,2.5) -- (-0.1,4.5) node[above, font=\tiny] {freq.};
-        \draw[->, mgray] (0,1.8) -- (3.2,1.8) node[right, font=\tiny] {time};
-        \node[morange!70!red, font=\footnotesize] at (1.5,1.2) {many $\Omega$ excited};
-
-        % Chirped pulses
-        \node[font=\small, align=center] at (5.5,4.4) {\textbf{Chirped (SF-CARS)}};
-        \shade[left color=red!40, right color=blue!40]
-              (3.8,2.8) -- (7.2,2.8) -- (7.2,4.2) -- (3.8,4.2) -- cycle;
-        \shade[left color=red!30, right color=blue!30]
-              (3.8,2.0) -- (7.2,2.0) -- (7.2,3.4) -- (3.8,3.4) -- cycle;
-        \draw[mblue, thick] (3.8,2.8) rectangle (7.2,4.2);
-        \draw[morange, thick] (3.8,2.0) rectangle (7.2,3.4);
-        \node[mblue, font=\small] at (5.5,3.9) {pump};
-        \node[morange, font=\small] at (5.5,2.3) {Stokes};
-        \draw[->, mgray] (3.6,2.5) -- (3.6,4.5) node[above, font=\tiny] {freq.};
-        \draw[->, mgray] (3.8,1.8) -- (7.4,1.8) node[right, font=\tiny] {time};
-        % Highlight one time slice
-        \draw[mgreen, very thick, dashed] (5.3,1.85) -- (5.3,4.25);
-        \node[mgreen, font=\footnotesize, rotate=90] at (5.05,3.2) {$\Omega_0$};
-        \node[mgreen, font=\footnotesize] at (5.5,1.2) {one $\Omega$ per slice};
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[
+          width=6.5cm, height=4.8cm,
+          xlabel={Raman shift (\(\text{cm}^{-1}\))},
+          ylabel={Intensity (a.u.)},
+          xmin=2500, xmax=3800,
+          ymin=0, ymax=1.3,
+          xtick={2700, 3000, 3200, 3500},
+          xticklabel style={font=\tiny},
+          yticklabel style={font=\tiny},
+          xlabel style={font=\small},
+          ylabel style={font=\small},
+          axis line style={thin},
+          tick style={thin},
+        ]
+          \addplot[thick, mblue, samples=80, domain=2700:3800]
+            {0.9*exp(-((x-3200)/120)^2) + 0.6*exp(-((x-2900)/80)^2)};
+          \draw[dashed, mgray] (axis cs:3200,0) -- (axis cs:3200,0.95);
+          \node[font=\tiny, anchor=west, mgreen]
+            at (axis cs:3220, 0.80) {CH$_2$, 3200\,cm$^{-1}$};
+          \node[font=\tiny, anchor=east, mgray]
+            at (axis cs:2890, 0.55) {CH$_2$};
+        \end{axis}
       \end{tikzpicture}
+
+      \vspace{0.3em}
+      {\small Pump: \SI{803}{nm} \quad Stokes: \SI{1041}{nm}
+             \quad AS: \SI{654}{nm}}
   \end{columns}
 \end{frame}
 
-% ============================================================
-% SECTION 2 — SETUP
-% ============================================================
-\section{Experimental \& Simulation Setup}
-
-% ── Slide 5: System Parameters ───────────────────────────────
-\begin{frame}{System Parameters}
-  \begin{columns}[T]
-    \column{0.55\textwidth}
-      \begin{table}
-        \centering
-        \renewcommand{\arraystretch}{1.3}
-        \begin{tabular}{lcc}
-          \toprule
-          \textbf{Parameter} & \textbf{Pump} & \textbf{Stokes} \\
-          \midrule
-          Central wavelength & \SI{803.31}{nm} & \SI{1041.22}{nm} \\
-          Spectral FWHM (intensity) & \SI{11.77}{nm} & \SI{8.92}{nm} \\
-          Bandwidth & \SI{2.05}{THz} & \SI{1.80}{THz} \\
-          TL temporal FWHM & \SI{80.7}{fs} & \SI{178.9}{fs} \\
-          Time–bandwidth product & 0.441 & 0.441 \\
-          \bottomrule
-        \end{tabular}
-      \end{table}
-
-      \vspace{0.8em}
-      \begin{block}{Two scenarios explored}
-        \begin{tabular}{lcc}
-          & \textbf{Pump glass} & \textbf{Stokes glass} \\
-          \midrule
-          Scenario A & 150 mm & 150 mm \\
-          Scenario B & 50 mm & 150 mm \\
-        \end{tabular}
-      \end{block}
-
-    \column{0.42\textwidth}
-      \begin{block}{Glass: S-TIH6}
-        Schott dense titanium flint glass
-        \begin{itemize}
-          \item High refractive index ($n \approx 1.85$)
-          \item Strong normal dispersion at 800–1050 nm
-          \item Commercially available in thick slabs
-          \item Used here as a \emph{passive chirper}
-        \end{itemize}
-      \end{block}
-
-      \vspace{0.5em}
-      \begin{block}{Target Raman band}
-        $\Omega \approx 2845\wn$\\
-        (CH$_2$ lipid stretch, myelin)
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 6: S-TIH6 Glass Dispersion ────────────────────────
-\begin{frame}{S-TIH6 Glass: Dispersion and Chirp Direction}
-  \begin{columns}[T]
-    \column{0.52\textwidth}
-      \textbf{Sellmeier equation} for $n(\lambda)$:
-      \[
-        n^2(\lambda) = 1 + \sum_{j=1}^{3}\frac{B_j\,\lambda^2}{\lambda^2 - C_j}
-      \]
-
-      \vspace{0.5em}
-      \textbf{Group index:}
-      \[
-        n_g(\lambda) = n(\lambda) - \lambda\,\frac{dn}{d\lambda}
-      \]
-
-      Since $\dfrac{dn}{d\lambda} < 0$ (normal dispersion):
-      $\quad n_g > n$
-
-      \vspace{0.5em}
-      \textbf{Relative group delay} of spectral slice $\lambda_i$:
-      \[
-        \tau_g(\lambda_i) = \frac{d\bigl[n_g(\lambda_i) - n_g(\lambda_0)\bigr]}{c}
-      \]
-
-      \vspace{0.4em}
-      \begin{itemize}
-        \item $\lambda_i < \lambda_0$ (blue): $n_g$ larger $\Rightarrow$ \textbf{arrives later} ($\tau_g > 0$)
-        \item $\lambda_i > \lambda_0$ (red): $n_g$ smaller $\Rightarrow$ \textbf{arrives earlier} ($\tau_g < 0$)
-      \end{itemize}
-
-    \column{0.45\textwidth}
-      \begin{alertblock}{Chirp convention}
-        \textbf{Time domain} (at the sample):\\[0.3em]
-        \quad Red arrives first $\to$ Blue arrives last\\[0.3em]
-        \quad $\omega(t)$ increases with time\\[0.3em]
-        \quad $\Rightarrow$ \textbf{positive chirp}
-
-        \vspace{0.5em}
-        \textbf{Spatial snapshot} (pulse in flight):\\[0.3em]
-        \quad Red at the front (faster)\\[0.3em]
-        \quad $\Rightarrow$ "negative chirp" by spatial convention
-
-        \vspace{0.3em}
-        {\small Same physics, two viewpoints.\\
-        This simulation uses the \emph{time-domain} convention.}
-      \end{alertblock}
-
-      \vspace{0.4em}
-      \begin{block}{Group-velocity dispersion}
-        GVD $> 0$ for S-TIH6 at 800–1050 nm.\\
-        Normal dispersion $\Rightarrow$ pulse stretching.
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 7: Simulation Pipeline ─────────────────────────────
-\begin{frame}{Simulation Pipeline}
+% ──────────────────────────────────────────────────────────────
+% 3. SPECTRAL FOCUSING CONCEPT
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Stretching both pulses with glass makes the instantaneous frequency difference constant}
   \centering
-  \begin{tikzpicture}[
-    node distance=0.45cm and 1.1cm,
-    box/.style={draw, rounded corners=3pt, fill=mblue!10,
-                minimum width=2.8cm, minimum height=0.65cm,
-                font=\small, align=center},
-    gbox/.style={draw, rounded corners=3pt, fill=mgreen!12,
-                 minimum width=2.8cm, minimum height=0.65cm,
-                 font=\small, align=center},
-    obox/.style={draw, rounded corners=3pt, fill=morange!15,
-                 minimum width=2.8cm, minimum height=0.65cm,
-                 font=\small, align=center},
-    arr/.style={-{Stealth[scale=0.9]}, thick},
-    label/.style={font=\scriptsize, mgray}
-  ]
-    % Inputs
-    \node[box] (pump_in) {Pump\\$\Delta\lambda_I$, $\lambda_0$, glass};
-    \node[box, right=4.2cm of pump_in] (stk_in) {Stokes\\$\Delta\lambda_I$, $\lambda_0$, glass};
+  \begin{tikzpicture}[scale=0.82]
+    % --- TL ---
+    \node[font=\normalsize\bfseries] at (1.8, 5.1) {Transform-limited};
+    \fill[mblue!20]   (0.3,3.2) rectangle (3.3,4.6);
+    \fill[morange!20] (0.3,2.2) rectangle (3.3,3.6);
+    \draw[mblue,   thick] (0.3,3.2) rectangle (3.3,4.6);
+    \draw[morange, thick] (0.3,2.2) rectangle (3.3,3.6);
+    \node[mblue,   font=\small] at (1.8,4.2) {pump};
+    \node[morange, font=\small] at (1.8,2.6) {Stokes};
+    \draw[->, mgray] (0.0,2.8) -- (0.0,4.8) node[above, font=\tiny] {freq.};
+    \draw[->, mgray] (0.3,2.0) -- (3.6,2.0) node[right, font=\tiny] {time};
+    \node[morange!70!red, font=\small] at (1.8,1.3) {many $\Omega$ excited at once};
 
-    % build_pulse
-    \node[gbox, below=0.5cm of pump_in] (pump_bp) {\texttt{build\_pulse()}};
-    \node[gbox, below=0.5cm of stk_in]  (stk_bp)  {\texttt{build\_pulse()}};
+    % --- arrow ---
+    \node[font=\LARGE] at (4.8,3.4) {$\xrightarrow{\mathrm{glass}}$};
 
-    % arrows from inputs to build
-    \draw[arr] (pump_in) -- (pump_bp);
-    \draw[arr] (stk_in)  -- (stk_bp);
-
-    % 3D plots
-    \node[obox, below=0.45cm of pump_bp] (pump_plt) {3D plots\\$I(t,\lambda)$};
-    \node[obox, below=0.45cm of stk_bp]  (stk_plt)  {3D plots\\$I(t,\lambda)$};
-    \draw[arr] (pump_bp) -- (pump_plt);
-    \draw[arr] (stk_bp)  -- (stk_plt);
-
-    % Marginal
-    \node[obox, below=0.45cm of pump_plt] (marg_pump) {Marginal $I(t)$\\+ peak ratio};
-    \node[obox, below=0.45cm of stk_plt]  (marg_stk)  {Marginal $I(t)$\\+ peak ratio};
-    \draw[arr] (pump_plt) -- (marg_pump);
-    \draw[arr] (stk_plt)  -- (marg_stk);
-
-    % conv1
-    \node[gbox, below=0.85cm of $(marg_pump)!0.5!(marg_stk)$] (conv1)
-          {\texttt{compute\_conv1($\delta t$)}\\$C_1(\Omega, t)$};
-    \draw[arr] (marg_pump.south) -- ++(0,-0.3) -| (conv1.north west);
-    \draw[arr] (marg_stk.south)  -- ++(0,-0.3) -| (conv1.north east);
-
-    % optimal delay
-    \node[obox, right=0.7cm of conv1] (opt) {\texttt{find\_optimal}\\$\delta t^\star$};
-    \draw[arr] (conv1) -- (opt);
-    \draw[arr] (opt.west) -- (conv1.east);
-
-    % conv2
-    \node[gbox, below=0.5cm of conv1] (conv2)
-          {\texttt{compute\_conv2()}\\$C_2(\nu_{\rm AS}, t)$};
-    \draw[arr] (conv1) -- (conv2);
-
-    % stats + plots
-    \node[obox, below=0.45cm of conv2] (stats)
-          {\texttt{spectral\_stats()}\\RMS, centroid};
-    \draw[arr] (conv2) -- (stats);
-
+    % --- Chirped ---
+    \node[font=\normalsize\bfseries] at (8.2,5.1) {Chirped (SF-CARS)};
+    \shade[left color=red!35, right color=blue!35]
+          (5.5,3.2) -- (10.9,3.2) -- (10.9,4.6) -- (5.5,4.6) -- cycle;
+    \shade[left color=red!25, right color=blue!25]
+          (5.5,2.2) -- (10.9,2.2) -- (10.9,3.6) -- (5.5,3.6) -- cycle;
+    \draw[mblue,   thick] (5.5,3.2) rectangle (10.9,4.6);
+    \draw[morange, thick] (5.5,2.2) rectangle (10.9,3.6);
+    \node[mblue,   font=\small] at (8.2,4.2) {pump};
+    \node[morange, font=\small] at (8.2,2.6) {Stokes};
+    \draw[->, mgray] (5.2,2.8) -- (5.2,4.8) node[above, font=\tiny] {freq.};
+    \draw[->, mgray] (5.5,2.0) -- (11.2,2.0) node[right, font=\tiny] {time};
+    % one time slice
+    \draw[mgreen, very thick, dashed] (8.0,2.05) -- (8.0,4.65);
+    \node[mgreen, font=\small, rotate=90] at (7.7,3.4) {$\Omega_0$};
+    \node[mgreen, font=\small] at (8.2,1.3) {one $\Omega$ per time slice};
   \end{tikzpicture}
 \end{frame}
 
-% ============================================================
-% SECTION 3 — PULSE CHIRPING
-% ============================================================
-\section{Pulse Chirping Through Glass}
+% ──────────────────────────────────────────────────────────────
+% 4. TL PUMP — initial
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{The pump starts transform-limited: all 80 spectral slices peak together at $t=0$}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/pump_step0_initial.pdf}
+\end{frame}
 
-% ── Slide 8: Field vs Intensity Convention ───────────────────
-\begin{frame}{Physical Convention: Field vs.\ Intensity}
-  \begin{columns}[T]
-    \column{0.5\textwidth}
-      \textbf{Pulse stored as field amplitude $E$, not intensity $I$:}
-      \[
-        E(t, \lambda_i) = A_E(\lambda_i)\,\exp\!\left(-\frac{(t - \tau_g(\lambda_i))^2}{\taue^2}\right)
-      \]
+% ──────────────────────────────────────────────────────────────
+% 5. TL STOKES — initial
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{The Stokes pulse is transform-limited too, but twice as long at 1041 nm}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/stokes_step0_initial.pdf}
+\end{frame}
 
-      \begin{itemize}
-        \item $A_E(\lambda_i)$: spectral weight (field Gaussian envelope)
-        \item $\taue$: field Gaussian parameter
-        \item $\tau_g(\lambda_i)$: relative group delay of slice $\lambda_i$
-        \item Intensity plotted as $I = E^2$
-      \end{itemize}
+% ──────────────────────────────────────────────────────────────
+% 6. SIMULATION PIPELINE
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{The simulation shifts each spectral slice by its group delay, then computes two convolutions}
+  \centering
+  \vspace{-0.2em}
+  \[
+    \tau_g(\lambda_i) = \frac{d\,\bigl[n_g(\lambda_i) - n_g(\lambda_0)\bigr]}{c},
+    \quad n_g = n - \lambda\,\tfrac{dn}{d\lambda}
+  \]
+  \vspace{0.4em}
+  \resizebox{0.97\textwidth}{!}{%
+    \begin{tikzpicture}[
+      node distance=0.4cm and 1.2cm,
+      box/.style ={draw, rounded corners=4pt, fill=mblue!10,
+                   minimum width=3.2cm, minimum height=0.75cm,
+                   font=\small, align=center},
+      gbox/.style={draw, rounded corners=4pt, fill=mgreen!15,
+                   minimum width=3.2cm, minimum height=0.75cm,
+                   font=\small, align=center},
+      obox/.style={draw, rounded corners=4pt, fill=morange!15,
+                   minimum width=3.2cm, minimum height=0.75cm,
+                   font=\small, align=center},
+      arr/.style={-{Stealth[scale=0.9]}, thick},
+      sub/.style={font=\scriptsize, mgray},
+    ]
+      \node[box]  (inp)  {Spectral envelope $A(\lambda)$\\+ glass thickness $d$};
+      \node[gbox, right=1.4cm of inp]  (prop) {Apply $\tau_g(\lambda_i)$\\per slice};
+      \node[obox, right=1.4cm of prop] (c1)   {Conv.\ 1\\$C_1(\Omega,t) = \Epump \cdot \Estokes$};
+      \node[obox, right=1.4cm of c1]   (c2)   {Conv.\ 2\\$C_2(\nu_{\rm AS},t) = C_1 * \Epump$};
+      \draw[arr] (inp)  -- (prop);
+      \draw[arr] (prop) -- (c1);
+      \draw[arr] (c1)   -- (c2);
+      \node[sub, below=0.25cm of inp]   {input};
+      \node[sub, below=0.25cm of prop]  {chirped field};
+      \node[sub, below=0.25cm of c1]    {Raman excitation};
+      \node[sub, below=0.25cm of c2]    {anti-Stokes signal};
+    \end{tikzpicture}%
+  }
+  \vspace{0.5em}
 
-      \vspace{0.5em}
-      \textbf{Field vs.\ intensity FWHM:}
-      \[
-        \mathrm{FWHM}_I = \frac{\mathrm{FWHM}_E}{\sqrt{2}}
-      \]
+  {\small All operations on \textbf{field amplitudes} ($E$), not intensities — CARS coherence scales as $\Epump \cdot \Estokes$.}
+\end{frame}
 
+% ──────────────────────────────────────────────────────────────
+% 7. CHIRPED PUMP
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{15 cm of S-TIH6 stretches the pump 52$\times$, mapping frequency onto time}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/pump_step1_propagated.pdf}
+\end{frame}
+
+% ──────────────────────────────────────────────────────────────
+% 8. CHIRPED STOKES
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{The same glass chirps the Stokes only 7$\times$: dispersion is weaker at 1041 nm}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/stokes_step1_propagated.pdf}
+\end{frame}
+
+% ──────────────────────────────────────────────────────────────
+% 9. PUMP MARGINAL
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Chirping costs 92\% of pump peak power — but total energy is conserved}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/pump_step1b_marginal.pdf}
+\end{frame}
+
+% ──────────────────────────────────────────────────────────────
+% 10. STOKES MARGINAL
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Stokes loses only 49\% of peak power: it sweeps frequency more slowly}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/stokes_step1b_marginal.pdf}
+\end{frame}
+
+% ──────────────────────────────────────────────────────────────
+% 11. C1 ZERO DELAY
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{At each instant a single Raman mode is driven: the horizontal ridge is spectral focusing}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/conv1_zero_delay.pdf}
+\end{frame}
+
+% ──────────────────────────────────────────────────────────────
+% 12. C1 OPTIMAL DELAY
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Optimal delay is zero: matched chirp rates naturally align the two beams}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/conv1_optimal_delay.pdf}
+\end{frame}
+
+% ──────────────────────────────────────────────────────────────
+% 13. C1 COMPARISON
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Matched chirp delivers 27.1\,cm\textsuperscript{$-1$} Raman resolution — and timing barely matters}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/comparison_c1.pdf}
+\end{frame}
+
+% ──────────────────────────────────────────────────────────────
+% 14. C2 ZERO + OPTIMAL SIDE BY SIDE
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{The probe pump converts Raman coherence into anti-Stokes light at 654 nm}
+  \begin{columns}[c]
     \column{0.47\textwidth}
-      \textbf{Why use field amplitudes for convolutions?}
-
-      \vspace{0.4em}
-      Raman coherence is driven by:
-      \[
-        \rho(\Omega, t) \propto \Epump(t)\cdot\Estokes^*(t)
-      \]
-
-      This is a \emph{field $\times$ field} product — not $\sqrt{I}\times\sqrt{I}$.
-
-      \vspace{0.5em}
-      \begin{alertblock}{Using intensities would be wrong}
-        $I_p \cdot I_S = E_p^2 \cdot E_S^2$ overestimates the\\
-        effective nonlinear bandwidth by $\sim\!\sqrt{2}$,\\
-        artificially narrowing the Raman linewidth.
-      \end{alertblock}
-
-      \vspace{0.4em}
-      \textbf{Summary:}
-      \begin{tabular}{ll}
-        \toprule
-        Quantity & Level \\
-        \midrule
-        $E_{\rm init}$, $E_{\rm prop}$ & Field \\
-        3D pulse plots & Intensity ($E^2$) \\
-        $C_1$, $C_2$ & Field amplitude \\
-        \bottomrule
-      \end{tabular}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution/conv2_zero_delay.pdf}\\[0.3em]
+      {\small Zero delay}
+    \column{0.47\textwidth}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution/conv2_optimal_delay.pdf}\\[0.3em]
+      {\small Optimal delay ($\delta t^\star \approx 0$)}
   \end{columns}
 \end{frame}
 
-% ── Slide 9: Initial Pump Pulse ──────────────────────────────
-\begin{frame}{Pump Pulse — Transform-Limited (Before Glass)}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/pump_step0_initial.pdf}
-      \end{figure}
-
-    \column{0.40\textwidth}
-      \textbf{Transform-limited pulse}
-      \begin{itemize}
-        \item $\lambda_0 = \SI{803.31}{nm}$
-        \item Temporal FWHM: $\SI{80.7}{fs}$
-        \item All spectral components ($\Delta\lambda = \SI{11.77}{nm}$)\\
-              peak \emph{simultaneously} at $t = 0$
-        \item Time-bandwidth product $= 0.441$\\
-              (Gaussian limit)
-      \end{itemize}
-
-      \vspace{0.6em}
-      \begin{block}{Reading the plot}
-        The 2D heatmap shows intensity $I(t,\lambda) = E^2$.\\
-        At $t = 0$: all wavelengths bright.\\
-        The pulse is \emph{not} chirped — the ridge is vertical.
-      \end{block}
+% ──────────────────────────────────────────────────────────────
+% 15. C2 PROJECTIONS SIDE BY SIDE
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Both delays yield the same 41.5\,cm\textsuperscript{$-1$} anti-Stokes linewidth}
+  \begin{columns}[c]
+    \column{0.47\textwidth}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution/conv2_zero_delay_projection.pdf}\\[0.3em]
+      {\small Zero delay}
+    \column{0.47\textwidth}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution/conv2_optimal_delay_projection.pdf}\\[0.3em]
+      {\small Optimal delay — \textbf{RMS\,=\,41.5\,cm$^{-1}$}}
   \end{columns}
 \end{frame}
 
-% ── Slide 10: Chirped Pump Pulse ─────────────────────────────
-\begin{frame}{Pump Pulse — After 150 mm S-TIH6 Glass}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/pump_step1_propagated.pdf}
-      \end{figure}
+% ──────────────────────────────────────────────────────────────
+% 16. C2 COMPARISON (SCENARIO A)
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{The degenerate probe broadens the anti-Stokes spectrum 53\% beyond $C_1$}
+  \centering
+  \includegraphics[width=0.90\textwidth, height=0.78\textheight, keepaspectratio]
+    {../plots/resolution/comparison_c2.pdf}
+\end{frame}
 
-    \column{0.40\textwidth}
-      \textbf{Chirped pulse — key numbers:}
-      \begin{itemize}
-        \item Group-delay spread: $\mathbf{4.21\,\text{ps}}$
-        \item Elongation: $\approx\mathbf{52\times}$ the TL duration
-        \item Blue ($\lambda < \lambda_0$): arrives \emph{later}
-        \item Red ($\lambda > \lambda_0$): arrives \emph{earlier}
-      \end{itemize}
-
-      \vspace{0.5em}
-      \begin{block}{Reading the plot}
-        The bright ridge is now \emph{tilted}: each wavelength
-        peaks at its own group delay.\\[0.4em]
-        This tilt is the \textbf{chirp rate} — the linear
-        mapping of frequency onto time that enables
-        spectral focusing.
-      \end{block}
-
-      \vspace{0.4em}
-      \[
-        \tau_g(\lambda_i) = \frac{150\,\text{mm} \cdot \bigl[n_g(\lambda_i) - n_g(\lambda_0)\bigr]}{c}
-      \]
+% ──────────────────────────────────────────────────────────────
+% 17. C1 COMPARISON A vs B
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Halving pump glass from 15 to 5 cm doubles the Raman excitation linewidth}
+  \begin{columns}[c]
+    \column{0.47\textwidth}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution/comparison_c1.pdf}\\[0.3em]
+      {\small \textbf{Scenario A} — pump 15 cm\\[0.2em] \textbf{RMS\,=\,27.1\,cm$^{-1}$}}
+    \column{0.47\textwidth}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution_pump5cm/comparison_c1.pdf}\\[0.3em]
+      {\small \textbf{Scenario B} — pump 5 cm\\[0.2em] \textbf{RMS\,=\,58.7\,cm$^{-1}$}}
   \end{columns}
 \end{frame}
 
-% ── Slide 11: Peak Power Reduction — Pump ────────────────────
-\begin{frame}{Peak Power Reduction: The Musicians Analogy}
-  \begin{columns}[T]
-    \column{0.55\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/pump_step1b_marginal.pdf}
-        \caption*{\small Marginal temporal intensity $I(t) = \sum_i E^2(\lambda_i, t)$}
-      \end{figure}
-
-    \column{0.43\textwidth}
-      \textbf{Why does the peak drop?}
-
-      Glass is \emph{linear and lossless} — each spectral slice
-      $A_k$ is unchanged. But:
-
-      \vspace{0.4em}
-      \begin{tabular}{p{3.8cm}l}
-        \textbf{TL pulse:} all $n_{\rm spec}$ slices peak \emph{together} at $t=0$
-        & $\sum_i A_i^2$ \\[0.4em]
-        \textbf{Chirped pulse:} slice $k$ peaks alone at $t = \tau_g(k)$; others negligible
-        & $A_k^2$ \\
-      \end{tabular}
-
-      \vspace{0.5em}
-      \[
-        \frac{I_{\rm peak}^{\rm chirped}}{I_{\rm peak}^{\rm TL}}
-          = \frac{\max_k A_k^2}{\sum_i A_i^2}
-          = \frac{1}{\neff}
-      \]
-
-      \textbf{Measured:} ratio $= 0.080$, so $\neff \approx 12$
-
-      \vspace{0.4em}
-      \begin{alertblock}{Energy is conserved}
-        $\int I(t)\,dt$ identical before and after glass. \\
-        Measured: ratio $= 1.000\;(\checkmark)$
-      \end{alertblock}
+% ──────────────────────────────────────────────────────────────
+% 18. C2 COMPARISON A vs B
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Mismatched chirp degrades anti-Stokes resolution 2.6$\times$}
+  \begin{columns}[c]
+    \column{0.47\textwidth}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution/comparison_c2.pdf}\\[0.3em]
+      {\small \textbf{Scenario A} — pump 15 cm\\[0.2em] \textbf{RMS\,=\,41.5\,cm$^{-1}$}}
+    \column{0.47\textwidth}
+      \centering
+      \includegraphics[width=\linewidth, height=0.65\textheight, keepaspectratio]
+        {../plots/resolution_pump5cm/comparison_c2.pdf}\\[0.3em]
+      {\small \textbf{Scenario B} — pump 5 cm\\[0.2em] \textbf{RMS\,=\,108.5\,cm$^{-1}$}}
   \end{columns}
 \end{frame}
 
-% ── Slide 12: Stokes Before and After ────────────────────────
-\begin{frame}{Stokes Pulse — Before and After 150 mm Glass}
+% ──────────────────────────────────────────────────────────────
+% 19. SUMMARY TABLE
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{More pump glass: $2.6\times$ better resolution, $3\times$ lower peak power — the same knob controls both}
   \begin{columns}[T]
-    \column{0.48\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/stokes_step0_initial.pdf}
-        \caption*{\small Transform-limited ($\SI{178.9}{fs}$ FWHM)}
-      \end{figure}
-
-    \column{0.48\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/stokes_step1_propagated.pdf}
-        \caption*{\small After 150 mm S-TIH6: GD spread $= \SI{1.26}{ps}$, elongation $\approx 7\times$}
-      \end{figure}
-  \end{columns}
-
-  \vspace{0.3em}
-  \begin{block}{Why is Stokes chirped less than pump?}
-    At \SI{1041}{nm} the group-velocity dispersion of S-TIH6 is smaller
-    (flatter $n_g(\lambda)$ curve) $\Rightarrow$ less group-delay spread per nm of bandwidth.
-    Same glass thickness, smaller elongation factor.
-  \end{block}
-\end{frame}
-
-% ── Slide 13: Stokes Marginal ────────────────────────────────
-\begin{frame}{Stokes Marginal Intensity — Peak Reduction}
-  \begin{columns}[T]
-    \column{0.55\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/stokes_step1b_marginal.pdf}
-      \end{figure}
-
-    \column{0.42\textwidth}
-      \textbf{Stokes (150 mm S-TIH6):}
-      \begin{itemize}
-        \item GD spread: $\SI{1.26}{ps}$
-        \item Peak ratio: $\mathbf{0.513}$ ($-49\,\%$)
-        \item Elongation: $\approx 7\times$ TL
-      \end{itemize}
-
-      \vspace{0.6em}
-      \textbf{Compare to pump:}
-
-      \vspace{0.3em}
-      \begin{tabular}{lcc}
-        \toprule
-         & Pump & Stokes \\
-        \midrule
-        GD spread & \SI{4.21}{ps} & \SI{1.26}{ps} \\
-        Peak ratio & $0.080$ & $0.513$ \\
-        Elongation & $\approx 52\times$ & $\approx 7\times$ \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.6em}
-      Pump is much more stretched because it is at a shorter
-      wavelength where S-TIH6 has larger dispersion.
-  \end{columns}
-\end{frame}
-
-% ============================================================
-% SECTION 4 — CARS SIGNAL CHAIN
-% ============================================================
-\section{CARS Signal Chain}
-
-% ── Slide 14: C1 Formula ─────────────────────────────────────
-\begin{frame}{Raman Excitation — $C_1(\Omega, t)$}
-  \begin{columns}[T]
-    \column{0.52\textwidth}
-      The \textbf{Raman coherence amplitude} driven by the chirped pulse pair:
-
-      \vspace{0.5em}
-      \[
-        \boxed{
-          C_1(\Omega, t) = \sum_k \Epump(\nu_k, t)\cdot\Estokes(\nu_k - \Omega,\, t)
-        }
-      \]
-
-      \vspace{0.5em}
-      \begin{itemize}
-        \item $\Omega$: Raman shift (scanned over $2500$–$3800\wn$)
-        \item $\nu_k$: pump frequency at spectral slice $k$
-        \item $\nu_k - \Omega$: matching Stokes frequency (CARS condition)
-        \item Sum over all pump spectral slices
-      \end{itemize}
-
-      \vspace{0.5em}
-      \textbf{Physical meaning:} at each time $t$, only
-      those pump–Stokes pairs that are simultaneously present
-      contribute — this is the spectral-focusing mechanism.
-
-    \column{0.45\textwidth}
-      \begin{block}{Implementation}
-        \begin{itemize}
-          \item Stokes interpolated onto a fine\\
-                wavenumber grid
-          \item Index arithmetic maps pump $\nu_k$\\
-                to Stokes $\nu_k - \Omega$
-          \item Vectorised: $\sim\SI{10}{ms}$ per call
-          \item Scanned over $\delta t \in [-8, +8]\,\text{ps}$\\
-                (150 points) to find optimal delay
-        \end{itemize}
-      \end{block}
-
-      \vspace{0.4em}
-      \begin{block}{Output}
-        2D array $C_1[\Omega, t]$:\\[0.3em]
-        \quad $N_\Omega = 300$ (Raman axis)\\
-        \quad $N_t = 1000$ (time axis)
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 15: C1 at Zero Delay ───────────────────────────────
-\begin{frame}{$C_1(\Omega, t)$ at Zero Delay — Raman Coherence Map}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/conv1_zero_delay.pdf}
-      \end{figure}
-
-    \column{0.40\textwidth}
-      \textbf{What we see:}
-      \begin{itemize}
-        \item Vertical axis: Raman shift $\Omega$ ($\wn$)
-        \item Horizontal axis: time $t$ (ps)
-        \item Color/height: excitation amplitude
-      \end{itemize}
-
-      \vspace{0.5em}
-      \textbf{Key feature:} the ridge of $C_1$ is approximately
-      horizontal (constant $\Omega$ vs.\ $t$) for matched chirp rates.
-
-      This means: at each instant, the same Raman mode is driven,
-      confirming spectral focusing is working.
-
-      \vspace{0.5em}
-      \begin{block}{Raman center}
-        $\Omega_{\rm center} \approx 2834\wn$\\
-        {\small ($\nu_{\rm pump} - \nu_{\rm Stokes} = 2845\wn$ \checkmark)}
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 16: Optimal Delay ──────────────────────────────────
-\begin{frame}{Finding the Optimal Pump–Stokes Delay}
-  \begin{columns}[T]
-    \column{0.52\textwidth}
-      \textbf{Problem:} when chirp rates are mismatched (Scenario B),
-      the centres of mass of the two chirped pulses do not coincide.
-
-      \vspace{0.6em}
-      \textbf{Criterion — maximise total $C_1$ signal:}
-      \[
-        \delta t^\star = \arg\max_{\delta t}\;\sum_{\Omega, t} C_1(\Omega, t;\,\delta t)
-      \]
-
-      This maximises \emph{temporal overlap}, not spectral resolution.
-
-      \vspace{0.6em}
-      \begin{itemize}
-        \item \textbf{Scenario A} (matched, 150/150 mm):\\
-              $\delta t^\star \approx 0$ — pulses naturally aligned
-        \item \textbf{Scenario B} (mismatched, 50/150 mm):\\
-              $\delta t^\star \neq 0$ — pump less stretched, must shift
-      \end{itemize}
-
-    \column{0.45\textwidth}
-      \begin{alertblock}{What optimal delay is \emph{not}}
-        It is \textbf{not} the delay that minimises\\
-        the spectral width of $C_1(\Omega)$.
-
-        For mismatched chirp rates, the signal-maximising
-        and resolution-optimising delays are different.
-      \end{alertblock}
-
-      \vspace{0.6em}
-      \begin{block}{Algorithm}
-        Brute-force scan over 150 delay values\\
-        $\delta t \in [-8,\,+8]\,\text{ps}$\\
-        $\approx \SI{0.6}{s}$ total
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 17: C1 Comparison ──────────────────────────────────
-\begin{frame}{$C_1$ Spectral Resolution — Zero vs.\ Optimal Delay}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/comparison_c1.pdf}
-      \end{figure}
-
-    \column{0.40\textwidth}
-      \textbf{Scenario A (matched 15 cm / 15 cm):}
-
-      \vspace{0.4em}
-      \begin{tabular}{lcc}
-        \toprule
-         & $\delta t = 0$ & $\delta t^\star$ \\
-        \midrule
-        RMS width & $27.1\wn$ & $27.1\wn$ \\
-        Center & $2834\wn$ & $2834\wn$ \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.5em}
-      For matched chirp rates, optimal delay $\approx 0$,
-      so the two curves are nearly identical.
-
-      \vspace{0.5em}
-      \begin{block}{Spectral resolution}
-        $C_1$ RMS width $= \mathbf{27.1\wn}$
-
-        This is the effective Raman linewidth that the
-        system would measure at this glass thickness.
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 18: C2 Formula ─────────────────────────────────────
-\begin{frame}{Anti-Stokes Signal — $C_2(\nu_{\rm AS}, t)$}
-  \begin{columns}[T]
-    \column{0.52\textwidth}
-      The \textbf{anti-Stokes field amplitude} generated by a
-      degenerate pump probe reading out the Raman coherence:
-
-      \vspace{0.5em}
-      \[
-        \boxed{
-          C_2(\nuAS, t) = \int C_1(\Omega, t)\cdot\Epump(\nuAS - \Omega,\, t)\,d\Omega
-        }
-      \]
-
-      \vspace{0.5em}
-      \begin{itemize}
-        \item $\nuAS = \nu_p^{\rm center} + \Omega$: anti-Stokes frequency
-        \item This is $\omega_{\rm AS} = 2\omega_p - \omega_S$ at field level
-        \item \textbf{Output center:} $\nuAS \approx 15\,292\wn \approx \SI{654}{nm}$
-        \item The probe pump photon carries its own chirp $\Rightarrow$
-              broadens the final linewidth
-      \end{itemize}
-
-    \column{0.45\textwidth}
-      \begin{block}{Physical interpretation}
-        The Raman coherence $C_1(\Omega, t)$ is
-        "read out" by a second chirped pump photon.
-
-        Because this probe is \emph{also} frequency-swept,
-        it adds spectral uncertainty to the final CARS signal:
-        \[
-          \Delta\nuAS > \Delta\nu_{C_1}
-        \]
-      \end{block}
-
-      \vspace{0.4em}
-      \begin{block}{Implementation}
-        Per-time-step FFT convolution\\
-        (\texttt{fftconvolve})\\
-        $\sim\SI{0.1}{s}$ for 1000 time steps
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 19: C2 at Optimal Delay ────────────────────────────
-\begin{frame}{$C_2(\nu_{\rm AS}, t)$ — Time-Resolved Anti-Stokes Signal}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/conv2_optimal_delay.pdf}
-      \end{figure}
-
-    \column{0.40\textwidth}
-      \textbf{Reading the plot:}
-      \begin{itemize}
-        \item Vertical axis: anti-Stokes $\nu_{\rm AS}$ ($\wn$)
-        \item Horizontal axis: time $t$ (ps)
-        \item Color/height: AS field amplitude
-        \item Center: $\sim 15\,292\wn$ ($\sim \SI{654}{nm}$)
-      \end{itemize}
-
-      \vspace{0.5em}
-      The signal is produced over the entire
-      temporal overlap of the two chirped pulses
-      ($\sim$ ps scale).
-
-      \vspace{0.4em}
-      \begin{block}{Spectral content}
-        Each time slice maps to a different
-        anti-Stokes frequency — spectral
-        information encoded in time.
-      \end{block}
-  \end{columns}
-\end{frame}
-
-% ── Slide 20: C2 Spectral Projections ────────────────────────
-\begin{frame}{$C_2$ Spectral Projections — Zero vs.\ Optimal Delay}
-  \begin{columns}[T]
-    \column{0.48\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/conv2_zero_delay_projection.pdf}
-        \caption*{\small Zero delay}
-      \end{figure}
-
-    \column{0.48\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/conv2_optimal_delay_projection.pdf}
-        \caption*{\small Optimal delay ($\delta t^\star \approx 0$ for Scenario A)}
-      \end{figure}
-  \end{columns}
-
-  \vspace{0.3em}
-  \begin{block}{Scenario A result: $C_2$ RMS width $= \mathbf{41.5\wn}$}
-    Broader than $C_1$ ($27.1\wn$) because the degenerate probe pump photon
-    adds its own spectral uncertainty.
-    Center: $15\,292\wn \approx \SI{654}{nm}$ (\textcolor{mgreen}{$\checkmark$ consistent with $\nu_p + \Omega$}).
-  \end{block}
-\end{frame}
-
-% ── Slide 21: C2 Comparison ──────────────────────────────────
-\begin{frame}{$C_2$ Final Comparison — Scenario A}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution/comparison_c2.pdf}
-      \end{figure}
-
-    \column{0.40\textwidth}
-      \textbf{Anti-Stokes spectral resolution:}
-
-      \vspace{0.4em}
-      \begin{tabular}{lcc}
-        \toprule
-         & $\delta t = 0$ & $\delta t^\star$ \\
-        \midrule
-        RMS ($\wn$) & $41.5$ & $41.5$ \\
-        Center ($\wn$) & $15\,292$ & $15\,292$ \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.5em}
-      For Scenario A (matched chirp), the two delays give
-      essentially identical spectral shapes.
-
-      \vspace{0.5em}
-      \begin{alertblock}{Note}
-        $C_2$ measures the \emph{anti-Stokes spectrum} as\\
-        it would appear on a detector.  The RMS\\
-        $= 41.5\wn$ sets the spectral resolution\\
-        of this CARS system.
-      \end{alertblock}
-  \end{columns}
-\end{frame}
-
-% ============================================================
-% SECTION 5 — SCENARIO COMPARISON & CONCLUSIONS
-% ============================================================
-\section{Scenario Comparison \& Conclusions}
-
-% ── Slide 22: Scenario Comparison Table ──────────────────────
-\begin{frame}{Scenario A vs.\ B — Effect of Pump Glass Thickness}
-  \begin{columns}[T]
-    \column{0.52\textwidth}
-      \renewcommand{\arraystretch}{1.35}
+    \column{0.60\textwidth}
+      \vspace{0.2em}
+      \renewcommand{\arraystretch}{1.25}
       \begin{table}
-        \centering
+        \centering\small
         \begin{tabular}{lcc}
           \toprule
           & \textbf{Scenario A} & \textbf{Scenario B} \\
-          & 15 cm / 15 cm & 5 cm / 15 cm \\
+          & \footnotesize pump 15 cm & \footnotesize pump 5 cm \\
           \midrule
-          Pump GD spread & \SI{4.21}{ps} & \SI{1.40}{ps} \\
-          Pump elongation & $\approx 52\times$ & $\approx 17\times$ \\
-          Pump peak ratio & $0.080$ ($-92\%$) & $\approx 0.22$ ($-78\%$) \\
+          Pump GD spread     & \SI{4.21}{ps}           & \SI{1.40}{ps} \\
+          Pump elongation    & $\approx 52\times$      & $\approx 17\times$ \\
+          Pump peak ratio    & 0.080 \;($-92\%$)       & 0.22\phantom{0} \;($-78\%$) \\
           \midrule
-          Stokes GD spread & \SI{1.26}{ps} & \SI{1.26}{ps} \\
-          Stokes peak ratio & $0.513$ ($-49\%$) & $0.513$ ($-49\%$) \\
-          \midrule
-          $C_1$ RMS & $\mathbf{27.1\wn}$ & $\mathbf{58.7\wn}$ \\
-          $C_2$ RMS & $\mathbf{41.5\wn}$ & $\mathbf{108.5\wn}$ \\
-          \midrule
-          Optimal $\delta t$ & $\approx 0$ & $\neq 0$ \\
+          $C_1$ RMS ($\wn$)  & \textbf{27.1}           & \textbf{58.7} \\
+          $C_2$ RMS ($\wn$)  & \textbf{41.5}           & \textbf{108.5} \\
+          Optimal $\delta t$ & $\approx 0$             & $\neq 0$ \\
           \bottomrule
         \end{tabular}
       \end{table}
 
-    \column{0.45\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth, keepaspectratio]
-          {../plots/resolution_pump5cm/comparison_c2.pdf}
-        \caption*{\small Scenario B: $C_2$ comparison (RMS $= 108.5\wn$)}
-      \end{figure}
-  \end{columns}
-\end{frame}
-
-% ── Slide 23: Resolution–Signal Trade-off ────────────────────
-\begin{frame}{The Resolution–Signal Trade-off}
-  \begin{columns}[T]
-    \column{0.5\textwidth}
-      \textbf{More glass $\Rightarrow$ better resolution:}
-      \begin{itemize}
-        \item Larger GD spread $\Rightarrow$ longer pulse $\Rightarrow$\\
-              slower chirp rate (ps/nm)
-        \item At any instant, a narrower spectral\\
-              slice is active
-        \item $C_1$ RMS: $27\wn$ (A) vs.\ $59\wn$ (B)\\
-              — factor $\mathbf{2.2\times}$ improvement
-        \item $C_2$ RMS: $41\wn$ vs.\ $109\wn$\\
-              — factor $\mathbf{2.6\times}$ improvement
-      \end{itemize}
+    \column{0.37\textwidth}
+      \vspace{0.8em}
+      \alert{Chirp matching ($2\times$ glass ratio) gives $2.2\times$ better $C_1$ resolution.}
 
       \vspace{0.6em}
-      \textbf{More glass $\Rightarrow$ lower peak signal:}
-      \begin{itemize}
-        \item Pump peak: $0.080\times$ (A) vs.\ $0.22\times$ (B)
-        \item Longer pulse → lower instantaneous power
-        \item CARS scales as $I_p^2 I_S$ → signal drops fast
-      \end{itemize}
+      \alert{Anti-Stokes ($C_2$) improves $2.6\times$ — only Stokes glass is fixed.}
 
-    \column{0.47\textwidth}
-      \begin{block}{Design rule}
-        For a target Raman linewidth $\Gamma$:
-        \[
-          d_{\rm glass} \propto \frac{\Delta\nu_{\rm TL}}{\Gamma}
-        \]
-        Increasing $d$ beyond what $\Gamma$ requires
-        wastes peak power without gaining resolution.
-      \end{block}
-
-      \vspace{0.5em}
-      \begin{alertblock}{Matched chirp rates are essential}
-        Both beams must traverse the \emph{same} glass length
-        so their chirp rates match.
-        Mismatch (Scenario B) degrades resolution\\
-        by factor $2\times$ or more.
-      \end{alertblock}
+      \vspace{0.6em}
+      \alert{More glass $\Rightarrow$ narrower linewidth \emph{and} lower signal.}
   \end{columns}
 \end{frame}
 
-% ── Slide 24: Key Conclusions ────────────────────────────────
-\begin{frame}{Key Conclusions}
+% ──────────────────────────────────────────────────────────────
+% 20. CONCLUSIONS
+% ──────────────────────────────────────────────────────────────
+\begin{frame}{Spectral focusing turns femtosecond bandwidth into narrowband Raman sensitivity — chirp matching is the key}
   \begin{enumerate}
-    \setlength{\itemsep}{0.55em}
-
-    \item \textbf{S-TIH6 produces positive chirp.}
-          Normal dispersion at 800–1050 nm: blue photons travel
-          slower $\Rightarrow$ frequency sweeps red-to-blue at the sample.
-
-    \item \textbf{Chirp elongates pulses dramatically.}
-          Pump: $80\,\text{fs} \to 4.2\,\text{ps}$ ($52\times$);
-          Stokes: $179\,\text{fs} \to 1.3\,\text{ps}$ ($7\times$) through 150 mm glass.
-          Difference due to stronger dispersion at shorter wavelength.
-
+    \setlength{\itemsep}{0.60em}
+    \item \textbf{S-TIH6 imprints a linear frequency-to-time map.}
+          Pump: $80\,\text{fs} \to 4.2\,\text{ps}$ ($52\times$); Stokes: $179\,\text{fs} \to 1.3\,\text{ps}$ ($7\times$).
     \item \textbf{Peak power drops but energy is conserved.}
-          Pump peak ratio $= 0.080 = 1/\neff$ with $\neff \approx 12$.
-          $\int I(t)\,dt$ ratio $= 1.000\;(\checkmark)$.
-
-    \item \textbf{Matched chirp gives narrowest Raman linewidth.}
-          Scenario A (15/15 cm): $C_1$ RMS $= 27.1\wn$, $C_2$ RMS $= 41.5\wn$. \\
-          Mismatched pump (5 cm): $C_1 = 58.7\wn$, $C_2 = 108.5\wn$ — factor $2\times$ worse.
-
-    \item \textbf{Degenerate probe broadens the anti-Stokes spectrum.}
-          The second pump photon in $C_2$ adds spectral uncertainty:
-          $\Delta\nu_{C_2} > \Delta\nu_{C_1}$ by $\sim\!50\,\%$.
-
+          Pump peak ratio $= 0.080 = 1/\neff$; \;$\int I\,dt$ ratio $= 1.000$.
+    \item \textbf{Matched chirp rates achieve 27\,cm$^{-1}$ Raman resolution}
+          from an 11.77 nm input bandwidth — the time-frequency mapping acts as a narrowband filter.
+    \item \textbf{Mismatch is costly.}
+          Pump 5 vs.\ 15 cm: $C_1$ degrades $2.2\times$, $C_2$ degrades $2.6\times$.
+    \item \textbf{The degenerate probe adds 53\% spectral width.}
+          $C_2$ RMS $=41.5\wn > C_1$ RMS $=27.1\wn$; a narrowband probe would sharpen the final spectrum.
   \end{enumerate}
 \end{frame}
 
-% ── Slide 25: Future Work ────────────────────────────────────
-\begin{frame}{Limitations and Future Work}
-  \begin{columns}[T]
-    \column{0.5\textwidth}
-      \textbf{Current limitations:}
-      \begin{itemize}
-        \item \textbf{GVD only} — group delay computed from first-order
-              dispersion (group index). Third-order dispersion (TOD)
-              and higher not yet included.
-        \item \textbf{Transform-limited input} — assumes input pulses
-              are perfectly unchirped. Real laser outputs have
-              residual chirp.
-        \item \textbf{Delay criterion} — optimal delay maximises
-              signal, not resolution. For mismatched scenarios
-              these optima differ.
-        \item \textbf{1D spatial model} — no beam profile or
-              focusing geometry.
-      \end{itemize}
-
-    \column{0.47\textwidth}
-      \textbf{Next steps:}
-      \begin{enumerate}
-        \item Add \textbf{third-order dispersion} (TOD) to
-              \texttt{build\_pulse} and verify pulse shape distortion
-        \item Scan \textbf{glass thickness} continuously to produce
-              a resolution vs.\ signal curve
-        \item Verify that $C_1$ ridge is exactly horizontal
-              for matched chirp rates (consistency check)
-        \item Replace brute-force delay scan with
-              \textbf{golden-section search}
-        \item Extend to \textbf{experimental validation}:
-              compare predicted $C_2$ linewidth with
-              measured CARS spectra of lipid films
-      \end{enumerate}
-  \end{columns}
-\end{frame}
-
-% ── Thank you / Questions ─────────────────────────────────────
+% ──────────────────────────────────────────────────────────────
+% 21. CLOSING
+% ──────────────────────────────────────────────────────────────
 \begin{frame}[standout]
   \Huge Thank you
 
-  \vspace{0.6em}
+  \vspace{0.7em}
   \large Questions?
 
-  \vspace{1em}
+  \vspace{1.2em}
   \normalsize
-  Code: \texttt{github.com/} (branch \texttt{3d-propagation})\\[0.3em]
-  All plots and simulation scripts available.
+  Code: branch \texttt{3d-propagation} \;—\; \texttt{resolution.py}\\[0.4em]
+  All plots and simulation scripts available in the repository.
 \end{frame}
 
 % ============================================================

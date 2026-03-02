@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-03-02 — Delay-scan power & spectral-centre curves (Scenario A)
+
+### Added
+- **`run_delay_scan(pump, stokes, raman_axis)`**: scans Stokes delay τ over
+  `[−DELAY_SCAN_PS_RANGE, +DELAY_SCAN_PS_RANGE]` in `DELAY_SCAN_N` steps.  At each τ
+  records total C₁ and C₂ field amplitude (∫∫ C dΩ dt, consistent with
+  `find_optimal_delay`) plus the power-weighted spectral centre for each layer.
+  Prints a summary table (peak delay, centroid, RMS width, accessible spectral range).
+  Intended for Scenario A only.
+- **`plot_delay_scan(delays, power, center, …)`**: two-row figure (PDF + plotly HTML).
+  Row 1 — normalised signal power vs. Stokes delay with fill-under shading, vertical
+  markers for peak & centroid, annotated RMS width.
+  Row 2 — power-weighted spectral centre vs. delay for the thresholded region
+  (power > 1 % of peak), coloured scatter (plasma) by normalised power, accessible
+  range bounds, and tunable-span annotation.  Uses `constrained_layout` to eliminate
+  the tight-layout / colorbar conflict.
+- **Steps 11–12 in `run_scenario`** (Scenario A only, `pump_glass_mm == 150`):
+  calls `run_delay_scan` then `plot_delay_scan` for both C₁ and C₂.
+  Output files: `step11_c1_delay_scan.{pdf,html}` and `step12_c2_delay_scan.{pdf,html}`
+  in `plots/resolution/`.
+
+### Results (Scenario A, both 15 cm S-TIH6, 150-point delay scan ±8 ps)
+- **C₁ (Raman excitation)**:
+  - Power peak: τ = −0.054 ps (≈ 0, as expected for symmetric glass lengths)
+  - RMS width of power curve: **0.631 ps** → accessible delay range
+  - Accessible Raman range: **2526 – 3183 cm⁻¹** (tunable span = 657 cm⁻¹)
+  - Power-weighted spectral RMS: 114.8 cm⁻¹
+- **C₂ (anti-Stokes signal)**:
+  - Power peak: τ = −0.054 ps (same as C₁)
+  - RMS width: **0.455 ps** (narrower — second pump interaction restricts window)
+  - Accessible AS range: **14971 – 15771 cm⁻¹** (tunable span = 799 cm⁻¹)
+  - Power-weighted spectral RMS: 148.8 cm⁻¹
+
+### Physics interpretation
+- The spectral centre shifts **linearly** with delay (spectral focusing tuning rate
+  ≈ 330 cm⁻¹/ps for C₁, ≈ 400 cm⁻¹/ps for C₂).
+- C₂ has a narrower power window but a wider absolute AS span because the probe pump
+  dispersion adds to the spectral shift on the anti-Stokes axis.
+
 ## 2026-02-27 — Fix pulse plot aliasing; document marginal intensity physics
 
 ### Changed

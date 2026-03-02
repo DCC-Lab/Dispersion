@@ -517,6 +517,69 @@ def spectral_stats(raman_axis, spectrum):
     return nu_bar, sigma
 
 
+def run_delay_scan(pump, stokes, raman_axis):
+    """
+    Scan Stokes delay τ over [−DELAY_SCAN_PS_RANGE, +DELAY_SCAN_PS_RANGE] and
+    record at each delay:
+
+      p1 — total C₁ field amplitude  (∫∫ C₁ dΩ dt, consistent with find_optimal_delay)
+      c1 — power-weighted Raman centre [cm⁻¹]
+      p2 — total C₂ field amplitude  (∫∫ C₂ dν dt)
+      c2 — power-weighted anti-Stokes centre [cm⁻¹]
+
+    The anti-Stokes axis is delay-independent (depends only on pump centre λ and
+    raman_axis), so it is pre-computed once and returned for use in plotting.
+
+    Intended for Scenario A only (pump 15 cm + Stokes 15 cm).
+    """
+    delays = np.linspace(-DELAY_SCAN_PS_RANGE, DELAY_SCAN_PS_RANGE, DELAY_SCAN_N)
+    p1 = np.zeros(len(delays))
+    c1 = np.zeros(len(delays))
+    p2 = np.zeros(len(delays))
+    c2 = np.zeros(len(delays))
+    eps = 1e-30
+
+    # Anti-Stokes axis is delay-independent — pre-compute once
+    nu_pump_center = 1e7 / pump['lambda0_nm']
+    as_axis = nu_pump_center + raman_axis
+
+    print(f"  Scanning {len(delays)} delays  "
+          f"τ ∈ [{delays[0]:+.1f}, {delays[-1]:+.1f}] ps …")
+
+    for k, tau in enumerate(delays):
+        if k == 0 or (k + 1) % 30 == 0 or k == len(delays) - 1:
+            print(f"    [{k+1:3d}/{len(delays)}]  τ = {tau:+.3f} ps")
+
+        t_common, C1 = compute_conv1(pump, stokes, raman_axis, delay_ps=tau)
+        p1[k] = C1.sum()
+        c1[k] = np.average(raman_axis, weights=C1.sum(axis=1) + eps)
+
+        _, C2 = compute_conv2_2d(C1, pump, t_common, raman_axis)
+        p2[k] = C2.sum()
+        c2[k] = np.average(as_axis, weights=C2.sum(axis=1) + eps)
+
+    # Print summary statistics
+    def _scan_stats(power, center, name, axis_unit='cm⁻¹'):
+        peak_val  = power.max()
+        tau_mean  = np.average(delays, weights=power)
+        tau_rms   = np.sqrt(np.average((delays - tau_mean)**2, weights=power))
+        mask      = power > 0.01 * peak_val
+        if mask.any():
+            c_min, c_max = center[mask].min(), center[mask].max()
+        else:
+            c_min = c_max = np.nan
+        print(f"  {name}: peak at τ = {delays[np.argmax(power)]:+.3f} ps  |  "
+              f"centroid = {tau_mean:+.3f} ps  |  RMS width = {tau_rms:.3f} ps")
+        print(f"      accessible {axis_unit} range: {c_min:.0f} – {c_max:.0f}  "
+              f"(span = {c_max - c_min:.0f} {axis_unit})")
+
+    print()
+    _scan_stats(p1, c1, 'C₁ (Raman excitation)', axis_unit='cm⁻¹')
+    _scan_stats(p2, c2, 'C₂ (anti-Stokes signal)', axis_unit='cm⁻¹')
+
+    return delays, p1, c1, p2, c2, as_axis
+
+
 # ─────────────────────────────────────────────
 #  PLOTTING HELPERS
 # ─────────────────────────────────────────────
@@ -773,6 +836,162 @@ def plot_comparison(axis,
     return fig
 
 
+def plot_delay_scan(delays, power, center,
+                    title, center_label, step_name, output_dir):
+    """
+    Two-row figure for the Stokes-delay scan results (Scenario A only).
+
+    Row 1 — Signal power vs. Stokes delay τ
+        Power is normalised to its peak value.  A shaded fill-under curve
+        emphasises the accessible delay range.  Key metrics (peak delay,
+        centroid, RMS width of the curve) are annotated directly on the panel.
+
+    Row 2 — Power-weighted spectral centre vs. Stokes delay τ
+        Only the portion where power exceeds 1 % of the peak is shown as a
+        scatter coloured by normalised power (plasma colourmap).  The
+        accessible spectral range and tunable span are annotated directly
+        on the panel.
+
+    Parameters
+    ----------
+    delays       : [N]   Stokes delay axis [ps]
+    power        : [N]   integrated signal at each delay (field-amplitude sum)
+    center       : [N]   power-weighted spectral centre at each delay [cm⁻¹]
+    title        : str   figure suptitle
+    center_label : str   y-axis label for the spectral-centre panel
+    step_name    : str   output filename stem (no extension)
+    output_dir   : str   output directory
+    """
+    eps = 1e-30
+
+    # ── Derived metrics ──────────────────────────────────────────────────────
+    peak_val = power.max()
+    peak_idx = np.argmax(power)
+    tau_peak = delays[peak_idx]
+    tau_mean = np.average(delays, weights=power + eps)
+    tau_rms  = np.sqrt(np.average((delays - tau_mean)**2, weights=power + eps))
+
+    mask = power > 0.01 * peak_val
+    c_min  = center[mask].min()  if mask.any() else np.nan
+    c_max  = center[mask].max()  if mask.any() else np.nan
+    c_span = c_max - c_min       if mask.any() else np.nan
+    c_mean = np.average(center[mask], weights=power[mask] + eps) if mask.any() else np.nan
+    c_rms  = (np.sqrt(np.average((center[mask] - c_mean)**2, weights=power[mask] + eps))
+              if mask.any() else np.nan)
+
+    pn = power / (peak_val + eps)   # normalised for display
+
+    # ── Matplotlib ───────────────────────────────────────────────────────────
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8),
+                                   sharex=True, layout='constrained',
+                                   gridspec_kw={'hspace': 0.10})
+
+    # Panel 1 — power ─────────────────────────────────────────────────────────
+    ax1.fill_between(delays, pn, alpha=0.22, color='steelblue')
+    ax1.plot(delays, pn, lw=2, color='steelblue', label='Normalised signal power')
+    ax1.axvline(tau_peak, color='crimson', lw=1.4, ls='--',
+                label=f'Peak  τ = {tau_peak:+.3f} ps')
+    ax1.axvline(tau_mean, color='darkorange', lw=1.1, ls=':',
+                label=f'Centroid  τ = {tau_mean:+.3f} ps')
+
+    info1 = (f'Peak:     τ = {tau_peak:+.3f} ps\n'
+             f'Centroid: τ = {tau_mean:+.3f} ps\n'
+             f'RMS width: {tau_rms:.3f} ps')
+    ax1.annotate(info1, xy=(0.02, 0.97), xycoords='axes fraction',
+                 fontsize=9, va='top',
+                 bbox=dict(boxstyle='round,pad=0.45', fc='lightyellow', alpha=0.92))
+
+    ax1.set_ylabel('Signal (normalised)', fontsize=10)
+    ax1.set_ylim(-0.05, 1.20)
+    ax1.legend(fontsize=9, loc='upper right')
+    ax1.grid(True, alpha=0.25)
+
+    # Panel 2 — spectral centre ───────────────────────────────────────────────
+    # Derive unit and numeric format from the center_label, e.g. "... (nm)" → "nm"
+    _lp, _rp = center_label.rfind('('), center_label.rfind(')')
+    center_unit = center_label[_lp + 1 : _rp] if _lp >= 0 and _rp > _lp else ''
+    c_fmt = '.1f' if center_unit == 'nm' else '.0f'
+
+    # Only plot the thresholded region — noisy tail values are omitted
+    # Thresholded scatter coloured by normalised power
+    if mask.any():
+        sc = ax2.scatter(delays[mask], center[mask],
+                         c=pn[mask], cmap='plasma',
+                         s=12, zorder=3, vmin=0.0, vmax=1.0)
+        cbar = fig.colorbar(sc, ax=ax2, fraction=0.030, pad=0.015)
+        cbar.set_label('Normalised power', fontsize=8)
+
+        # Accessible range shading and bounds
+        ax2.axhspan(c_min, c_max, alpha=0.08, color='green', zorder=0)
+        ax2.axhline(c_min, color='seagreen', lw=0.9, ls='--', alpha=0.75,
+                    label=f'{c_min:{c_fmt}} {center_unit}')
+        ax2.axhline(c_max, color='seagreen', lw=0.9, ls='--', alpha=0.75,
+                    label=f'{c_max:{c_fmt}} {center_unit}')
+
+    info2 = (f'Accessible range: {c_min:{c_fmt}} – {c_max:{c_fmt}} {center_unit}\n'
+             f'Tunable span: {c_span:{c_fmt}} {center_unit}\n'
+             f'Power-weighted RMS: {c_rms:.2f} {center_unit}\n'
+             f'(region where power > 1 % of peak)')
+    ax2.annotate(info2, xy=(0.02, 0.97), xycoords='axes fraction',
+                 fontsize=9, va='top',
+                 bbox=dict(boxstyle='round,pad=0.45', fc='lightcyan', alpha=0.92))
+
+    ax2.set_xlabel('Stokes delay  τ (ps)', fontsize=10)
+    ax2.set_ylabel(center_label, fontsize=10)
+    ax2.margins(y=0.18)
+    ax2.grid(True, alpha=0.25)
+    if mask.any():
+        ax2.legend(fontsize=8, loc='upper right', title='Bounds (1 % threshold)')
+
+    fig.suptitle(title, fontsize=11)
+    plt.show(block=False)
+    plt.pause(0.3)
+    _save(fig, step_name, output_dir)
+
+    # ── Plotly HTML ───────────────────────────────────────────────────────────
+    if _PLOTLY:
+        from plotly.subplots import make_subplots as _make_subplots
+        pfig = _make_subplots(
+            rows=2, cols=1, shared_xaxes=True,
+            subplot_titles=['Signal power (normalised)',
+                            center_label + ' vs. Stokes delay'],
+            vertical_spacing=0.10)
+
+        # Row 1: power
+        pfig.add_trace(go.Scatter(
+            x=delays, y=pn, mode='lines', fill='tozeroy',
+            line=dict(color='steelblue', width=2),
+            name='Power (normalised)'), row=1, col=1)
+        pfig.add_trace(go.Scatter(
+            x=[tau_peak], y=[pn[peak_idx]], mode='markers',
+            marker=dict(color='crimson', size=11, symbol='diamond'),
+            name=f'Peak  τ={tau_peak:+.3f} ps'), row=1, col=1)
+        pfig.add_trace(go.Scatter(
+            x=[tau_mean, tau_mean], y=[0, 1], mode='lines',
+            line=dict(color='darkorange', width=1.5, dash='dot'),
+            name=f'Centroid τ={tau_mean:+.3f} ps'), row=1, col=1)
+
+        # Row 2: spectral centre (thresholded, coloured by power)
+        if mask.any():
+            pfig.add_trace(go.Scatter(
+                x=delays[mask], y=center[mask], mode='markers',
+                marker=dict(color=pn[mask], colorscale='Plasma',
+                            size=5, showscale=True,
+                            colorbar=dict(title='Norm. power',
+                                          len=0.42, y=0.20)),
+                name='Spectral centre (power > 1 %)'), row=2, col=1)
+
+        pfig.update_layout(
+            title=title,
+            xaxis2_title='Stokes delay  τ (ps)',
+            yaxis_title='Signal (normalised)',
+            yaxis2_title=center_label,
+            width=860, height=720)
+        _save_plotly(pfig, step_name, output_dir)
+
+    return fig
+
+
 # ─────────────────────────────────────────────
 #  SCENARIO PIPELINE
 # ─────────────────────────────────────────────
@@ -919,6 +1138,25 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
                     step_name='comparison_c2',
                     xlabel='Anti-Stokes − centroid (cm⁻¹)',
                     suptitle='C₂ — sf-CARS signal, centred comparison')
+
+    # ── [11–12] Delay scan — Scenario A only ─────────────────────────────────
+    if pump_glass_mm == 150 and stokes_glass_mm == 150:
+        print("\n[11/12] Delay scan — power & spectral centre vs Stokes delay …")
+        delays, p1, c1, p2, c2, _ = run_delay_scan(pump, stokes, raman_axis)
+
+        print("\n[12/12] Plotting delay-scan results …")
+        plot_delay_scan(
+            delays, p1, c1,
+            title=(f'C₁ — Raman excitation power vs Stokes delay\n{scenario_label}'),
+            center_label='Raman centre (cm⁻¹)',
+            step_name='step11_c1_delay_scan',
+            output_dir=output_dir)
+        plot_delay_scan(
+            delays, p2, 1e7 / c2,   # convert anti-Stokes centre cm⁻¹ → nm
+            title=(f'C₂ — Anti-Stokes signal power vs Stokes delay\n{scenario_label}'),
+            center_label='Anti-Stokes centre (nm)',
+            step_name='step12_c2_delay_scan',
+            output_dir=output_dir)
 
     print(f"\nOutputs saved in: {os.path.abspath(output_dir)}")
 
