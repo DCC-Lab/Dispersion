@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-03-02 — Increase spectral grid resolution (N_SPEC 80 → 400)
+
+### Changed
+- **`N_SPEC = 400`** (was 80): spectral grid points per beam in `resolution.py`.
+  Root cause of the discrete "rib" artefacts in `pump_step0_initial` and
+  `pump_step1_propagated` was that adjacent slices were separated by ~53 fs in
+  group delay, exceeding the individual field width (~48 fs) so each slice was
+  visually distinct.  With 400 points ΔGD ≈ 10 fs ≪ τ_field → smooth continuous
+  Gaussian surfaces in both PDF (pcolormesh) and interactive HTML (plotly surface).
+  Change propagates automatically into `compute_conv1`, `compute_conv2_2d`, and
+  `run_delay_scan` (no other code changes required).
+- Estimated runtime impact: `run_delay_scan` ~80 s (was ~16 s); full pipeline ~200 s.
+
 ## 2026-03-02 — Delay-scan power & spectral-centre curves (Scenario A)
 
 ### Added
