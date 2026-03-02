@@ -40,7 +40,7 @@ STOKES_LAMBDA0_NM = 1041.22   # Stokes central wavelength [nm]
 
 GLASS_MATERIAL = 'stih6'    # Currently only stih6 supported
 
-N_SPEC   = 80     # Spectral grid points per beam
+N_SPEC   = 400    # Spectral grid points per beam (400 → ΔGD ≈ 10 fs ≪ τ_pump ≈ 48 fs → smooth surfaces)
 N_TIME   = 1000   # Time grid points
 
 RAMAN_MIN_CM1 = 2500   # Raman axis lower bound [cm⁻¹]
@@ -53,7 +53,7 @@ DELAY_SCAN_N        = 150   # Number of delay points to scan
 # Scenarios — (pump_glass_mm, stokes_glass_mm, output_dir)
 SCENARIOS = [
     (150, 150, 'plots/resolution',         'Scenario A — pump 15 cm · Stokes 15 cm'),
-    ( 50, 150, 'plots/resolution_pump5cm', 'Scenario B — pump  5 cm · Stokes 15 cm'),
+    # ( 50, 150, 'plots/resolution_pump5cm', 'Scenario B — pump  5 cm · Stokes 15 cm'),
 ]
 
 # ─────────────────────────────────────────────
@@ -524,8 +524,10 @@ def run_delay_scan(pump, stokes, raman_axis):
 
       p1 — total C₁ field amplitude  (∫∫ C₁ dΩ dt, consistent with find_optimal_delay)
       c1 — power-weighted Raman centre [cm⁻¹]
+      w1 — RMS spectral width of C₁ at each delay [cm⁻¹]
       p2 — total C₂ field amplitude  (∫∫ C₂ dν dt)
       c2 — power-weighted anti-Stokes centre [cm⁻¹]
+      w2 — RMS spectral width of C₂ at each delay [cm⁻¹]
 
     The anti-Stokes axis is delay-independent (depends only on pump centre λ and
     raman_axis), so it is pre-computed once and returned for use in plotting.
@@ -535,9 +537,10 @@ def run_delay_scan(pump, stokes, raman_axis):
     delays = np.linspace(-DELAY_SCAN_PS_RANGE, DELAY_SCAN_PS_RANGE, DELAY_SCAN_N)
     p1 = np.zeros(len(delays))
     c1 = np.zeros(len(delays))
+    w1 = np.zeros(len(delays))
     p2 = np.zeros(len(delays))
     c2 = np.zeros(len(delays))
-    eps = 1e-30
+    w2 = np.zeros(len(delays))
 
     # Anti-Stokes axis is delay-independent — pre-compute once
     nu_pump_center = 1e7 / pump['lambda0_nm']
@@ -551,12 +554,14 @@ def run_delay_scan(pump, stokes, raman_axis):
             print(f"    [{k+1:3d}/{len(delays)}]  τ = {tau:+.3f} ps")
 
         t_common, C1 = compute_conv1(pump, stokes, raman_axis, delay_ps=tau)
+        spec1 = C1.sum(axis=1)
         p1[k] = C1.sum()
-        c1[k] = np.average(raman_axis, weights=C1.sum(axis=1) + eps)
+        c1[k], w1[k] = spectral_stats(raman_axis, spec1)
 
         _, C2 = compute_conv2_2d(C1, pump, t_common, raman_axis)
+        spec2 = C2.sum(axis=1)
         p2[k] = C2.sum()
-        c2[k] = np.average(as_axis, weights=C2.sum(axis=1) + eps)
+        c2[k], w2[k] = spectral_stats(as_axis, spec2)
 
     # Print summary statistics
     def _scan_stats(power, center, name, axis_unit='cm⁻¹'):
@@ -577,7 +582,7 @@ def run_delay_scan(pump, stokes, raman_axis):
     _scan_stats(p1, c1, 'C₁ (Raman excitation)', axis_unit='cm⁻¹')
     _scan_stats(p2, c2, 'C₂ (anti-Stokes signal)', axis_unit='cm⁻¹')
 
-    return delays, p1, c1, p2, c2, as_axis
+    return delays, p1, c1, w1, p2, c2, w2, as_axis
 
 
 # ─────────────────────────────────────────────
@@ -837,7 +842,8 @@ def plot_comparison(axis,
 
 
 def plot_delay_scan(delays, power, center,
-                    title, center_label, step_name, output_dir):
+                    title, center_label, step_name, output_dir,
+                    width=None):
     """
     Two-row figure for the Stokes-delay scan results (Scenario A only).
 
@@ -848,19 +854,23 @@ def plot_delay_scan(delays, power, center,
 
     Row 2 — Power-weighted spectral centre vs. Stokes delay τ
         Only the portion where power exceeds 1 % of the peak is shown as a
-        scatter coloured by normalised power (plasma colourmap).  The
-        accessible spectral range and tunable span are annotated directly
-        on the panel.
+        scatter coloured by normalised power (plasma colourmap).  When `width`
+        is provided, a ±σ filled band (tunnel) is drawn around the curve showing
+        the per-delay RMS spectral bandwidth.  The accessible spectral range and
+        tunable span are annotated directly on the panel.
 
     Parameters
     ----------
     delays       : [N]   Stokes delay axis [ps]
     power        : [N]   integrated signal at each delay (field-amplitude sum)
-    center       : [N]   power-weighted spectral centre at each delay [cm⁻¹]
+    center       : [N]   power-weighted spectral centre at each delay
     title        : str   figure suptitle
     center_label : str   y-axis label for the spectral-centre panel
     step_name    : str   output filename stem (no extension)
     output_dir   : str   output directory
+    width        : [N] or None  RMS spectral width at each delay (same units as
+                   center).  When provided, ±σ error bars are drawn on the
+                   spectral-centre panel.
     """
     eps = 1e-30
 
@@ -915,6 +925,13 @@ def plot_delay_scan(delays, power, center,
     # Only plot the thresholded region — noisy tail values are omitted
     # Thresholded scatter coloured by normalised power
     if mask.any():
+        # ±σ filled band (tunnel), drawn first so scatter sits on top
+        if width is not None:
+            ax2.fill_between(delays[mask],
+                             center[mask] - width[mask],
+                             center[mask] + width[mask],
+                             alpha=0.25, color='steelblue', zorder=1,
+                             label='±σ bandwidth')
         sc = ax2.scatter(delays[mask], center[mask],
                          c=pn[mask], cmap='plasma',
                          s=12, zorder=3, vmin=0.0, vmax=1.0)
@@ -928,9 +945,11 @@ def plot_delay_scan(delays, power, center,
         ax2.axhline(c_max, color='seagreen', lw=0.9, ls='--', alpha=0.75,
                     label=f'{c_max:{c_fmt}} {center_unit}')
 
+    _width_line = 'Band: ±σ spectral width\n' if width is not None else ''
     info2 = (f'Accessible range: {c_min:{c_fmt}} – {c_max:{c_fmt}} {center_unit}\n'
              f'Tunable span: {c_span:{c_fmt}} {center_unit}\n'
              f'Power-weighted RMS: {c_rms:.2f} {center_unit}\n'
+             f'{_width_line}'
              f'(region where power > 1 % of peak)')
     ax2.annotate(info2, xy=(0.02, 0.97), xycoords='axes fraction',
                  fontsize=9, va='top',
@@ -973,6 +992,19 @@ def plot_delay_scan(delays, power, center,
 
         # Row 2: spectral centre (thresholded, coloured by power)
         if mask.any():
+            # ±σ filled band: upper edge then lower edge with fill='tonexty'
+            if width is not None:
+                pfig.add_trace(go.Scatter(
+                    x=delays[mask].tolist(),
+                    y=(center[mask] + width[mask]).tolist(),
+                    mode='lines', line=dict(width=0),
+                    showlegend=False, hoverinfo='skip'), row=2, col=1)
+                pfig.add_trace(go.Scatter(
+                    x=delays[mask].tolist(),
+                    y=(center[mask] - width[mask]).tolist(),
+                    mode='lines', line=dict(width=0),
+                    fill='tonexty', fillcolor='rgba(70,130,180,0.20)',
+                    name='±σ bandwidth'), row=2, col=1)
             pfig.add_trace(go.Scatter(
                 x=delays[mask], y=center[mask], mode='markers',
                 marker=dict(color=pn[mask], colorscale='Plasma',
@@ -1142,17 +1174,19 @@ def run_scenario(pump_glass_mm, stokes_glass_mm, output_dir, scenario_label):
     # ── [11–12] Delay scan — Scenario A only ─────────────────────────────────
     if pump_glass_mm == 150 and stokes_glass_mm == 150:
         print("\n[11/12] Delay scan — power & spectral centre vs Stokes delay …")
-        delays, p1, c1, p2, c2, _ = run_delay_scan(pump, stokes, raman_axis)
+        delays, p1, c1, w1, p2, c2, w2, _ = run_delay_scan(pump, stokes, raman_axis)
 
         print("\n[12/12] Plotting delay-scan results …")
         plot_delay_scan(
             delays, p1, c1,
+            width=w1,
             title=(f'C₁ — Raman excitation power vs Stokes delay\n{scenario_label}'),
             center_label='Raman centre (cm⁻¹)',
             step_name='step11_c1_delay_scan',
             output_dir=output_dir)
         plot_delay_scan(
             delays, p2, 1e7 / c2,   # convert anti-Stokes centre cm⁻¹ → nm
+            width=w2 * (1e7 / c2**2),  # propagate RMS: σ_λ = σ_ν × λ²/1e7
             title=(f'C₂ — Anti-Stokes signal power vs Stokes delay\n{scenario_label}'),
             center_label='Anti-Stokes centre (nm)',
             step_name='step12_c2_delay_scan',
