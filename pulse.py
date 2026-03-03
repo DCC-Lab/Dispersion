@@ -109,6 +109,7 @@ class Pulse:
     def propagate(self, d, indexFct=None):
         if indexFct is None:
             indexFct = self.bk7
+        self.indexFct = indexFct
 
         if np.mean(self.fieldEnvelope[0:10]) > 2e-4:
             self.S += self.S
@@ -135,7 +136,7 @@ class Pulse:
             "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle")
         plt.title(title)
         plt.xlabel("Time [ps]")
-        plt.ylabel("Field amplitude [arb.u.]")
+        plt.ylabel("Amplitude [arb.u.]")
         plt.ylim(-1, 1)
 
         axis = plt.gca()
@@ -152,8 +153,23 @@ class Pulse:
             verticalalignment="top",
         )
 
+    def drawTemporalAndSpectral(self, title=""):
+        fig, (axTime, axFreq) = plt.subplots(1, 2, figsize=(12, 5))
+
+        plt.sca(axTime)
+        self.setupPlot(title)
+        self.drawEnvelope(axTime)
+        self.drawChirpColour(axTime)
+
+        self.drawSpectrum(axFreq)
+        axFreq.set_title("Spectre")
+
+        plt.tight_layout()
+        return fig, axTime, axFreq
+
     def tearDownPlot(self):
-        plt.clf()
+        plt.close("all")
+        
 
     def drawEnvelope(self, axis=None):
         if axis is None:
@@ -174,7 +190,7 @@ class Pulse:
         ) = self.instantRadFrequency()
 
         timeIsPs = instantTime * 1e12
-        axis.plot(timeIsPs, instantEnvelope * np.cos(instantPhase), "k-")
+        axis.plot(timeIsPs, instantEnvelope * np.cos(instantPhase), "k-",  linewidth=0.5)
 
     def drawChirpColour(self, axis=None):
         if axis is None:
@@ -206,6 +222,54 @@ class Pulse:
             axis.add_patch(
                 Polygon([(t1, 0), (t1, e1), (t2, e2), (t2, 0)], facecolor=hsv(c))
             )
+
+    def drawSpectrum(self, axis=None):
+        if axis is None:
+            axis = plt.gca()
+
+        plt.style.use(
+            "https://raw.githubusercontent.com/dccote/Enseignement/master/SRC/dccote-errorbars.mplstyle")
+
+        frequencies = self.frequencies
+        spectrum = self.spectrum
+        amplitudes = abs(spectrum)
+        amplitudes /= amplitudes.max()
+
+        positiveFreqs = np.extract(frequencies > 0, frequencies)
+        positiveAmps = np.extract(frequencies > 0, amplitudes)
+        positiveSpectrum = np.extract(frequencies > 0, spectrum)
+
+        freqsInTHz = positiveFreqs * 1e-12
+        axis.plot(freqsInTHz, positiveAmps, "k-")
+        axis.set_xlabel("Frequency [THz]")
+        axis.set_ylabel("Amplitude [arb.u.]")
+
+        fₒInTHz = self.fₒ * 1e-12
+        Δf = self.spectralWidth * 1e-12
+        axis.set_xlim(fₒInTHz - 5 * Δf, fₒInTHz + 5 * Δf)
+
+        # Spectral phase via group delay on the raw positive-frequency spectrum.
+        # angle(S[k+1]*conj(S[k])) gives the wrapped phase step per bin. Unwrapping
+        # the dPhase array is robust because the GVD variation between consecutive
+        # bins is tiny (~0.002 rad). Subtracting the mean removes the group delay,
+        # and cumsum recovers the GVD (quadratic) phase.
+        mask = positiveAmps > 0.2
+        maskedSpectrum = positiveSpectrum[mask]
+        maskedFreqs = freqsInTHz[mask]
+
+        dPhase = np.angle(maskedSpectrum[1:] * np.conj(maskedSpectrum[:-1]))
+        dPhase = np.unwrap(dPhase)
+        dPhase -= np.mean(dPhase)
+        envPhase = np.concatenate(([0], np.cumsum(dPhase)))
+
+        linearFit = np.polyfit(maskedFreqs, envPhase, 1)
+        envPhase -= np.polyval(linearFit, maskedFreqs)
+
+        axPhase = axis.twinx()
+        axPhase.plot(maskedFreqs, envPhase, "r-")
+        axPhase.set_ylabel("Phase [rad]")
+        axPhase.set_ylim(-2*π,  2*π)
+        axPhase.tick_params(axis="y")
 
     def silica(self, wavelength):
         x = wavelength * 1e6
@@ -269,22 +333,24 @@ if __name__ == "__main__":
 
 
     # All adjustable parameters below
-    pulse = Pulse(𝛕=76e-15, 𝜆ₒ=805e-9) # 𝛕 must be the gaissian parameter in electric field
+    pulse = Pulse(𝛕=5e-15, 𝜆ₒ=805e-9) # 𝛕 must be the gaissian parameter in electric field
     # pulse = Pulse(𝛕=1.4142*151e-15, 𝜆ₒ=1045e-9) # 𝛕 must be the gaissian parameter in electric field
 
     # Material propertiues and distances, steps
     material = pulse.silica
-    totalDistance = 0.196
-    steps = 40
+    totalDistance = 0.001
+    steps = 400
 
     # What to display on graph in addition to envelope?
-    adjustTimeScale = False
-    showCarrier = False
+    adjustTimeScale = True
+    showCarrier = True
+    showChirpColour = True
 
     # Save graph? (set to None to not save)
     filenameTemplate = "fig-{0:02d}.png" # Can use PDF but PNG for making movies with Quicktime Player
 
     # End adjustable parameters
+
 
     print("#\td[mm]\t∆t[ps]\t∆𝝎[THz]\tProduct")
     stepDistance = totalDistance / steps
@@ -299,12 +365,20 @@ if __name__ == "__main__":
             )
         )
 
+        # fig, axTime , _ = pulse.drawTemporalAndSpectral()
+
+        # # 𝛕 = pulse.temporalWidth*1e12
+        # axTime.set_xlim(-1, 1)
+        axTime = None
         pulse.setupPlot("Propagation in {0}".format(material.__func__.__name__))
-        pulse.drawEnvelope()
-        pulse.drawChirpColour()
+        pulse.setupPlot()
+        pulse.drawEnvelope(axTime)
+
+        if showChirpColour:
+            pulse.drawChirpColour(axTime)
     
         if showCarrier:
-            pulse.drawField()
+            pulse.drawField(axTime)
 
         if adjustTimeScale:
             𝛕 = pulse.temporalWidth*1e12
